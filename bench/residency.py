@@ -95,18 +95,40 @@ class Server:
         return f"http://{self.host}:{self.port}/v1"
 
 
-def replay_once(server: Server, out_dir: str, replay: str, tool_mode: str, attached: str | None) -> dict:
+def replay_once(server: Server, out_dir: str, replay: str, tool_mode: str, attached: str | None, extra: list[str] | None = None) -> dict:
+    """One aa-mini replay against a server. `extra` is the CLI's --replay-arg list (e.g. `--device 0` on a box
+    where agentperf detects more than one accelerator)."""
     cmd = ["agentperf-local", "run", "--replay", replay, "--base-url", server.base_url, "--model", server.model_name,
            "--output-dir", out_dir, "--tool-mode", tool_mode, "--no-progress", "--no-power"]
     if attached:
         cmd += ["--attached-server", attached]
-    cmd += output_policy_args(server.engine, None)
+    cmd += output_policy_args(server.engine, extra)
     t0 = time.time()
     with open(out_dir + ".log", "w") as log:
         log.write(shlex.join(cmd) + "\n")
         log.flush()
         rc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT).returncode
     return {"exit_code": rc, "wall_s": round(time.time() - t0, 1), "summary": ingest_summary(out_dir)}
+
+
+def pick_victims(residents: dict[str, int], need_bytes: int, capacity_bytes: int | None) -> list[str]:
+    """Which resident servers to stop so an evicted model of `need_bytes` fits on the device.
+    `residents` maps model_id -> estimated bytes it holds. Victims are taken largest-first until the
+    freed bytes plus what the device already has free cover the need; without a capacity figure the
+    single largest resident is evicted (v0 behaviour). Returns [] when nothing is resident."""
+    if not residents:
+        return []
+    order = sorted(residents, key=lambda k: residents[k], reverse=True)
+    if capacity_bytes is None:
+        return order[:1]
+    free = capacity_bytes - sum(residents.values())
+    victims = []
+    for mid in order:
+        if free >= need_bytes:
+            break
+        victims.append(mid)
+        free += residents[mid]
+    return victims or order[:1]
 
 
 def run_residency(plan: dict, cat: dict, opts: dict, log=print) -> tuple[int, dict]:
@@ -159,7 +181,11 @@ def run_residency(plan: dict, cat: dict, opts: dict, log=print) -> tuple[int, di
     load_timeout = opts.get("load_timeout", 900)
     replay = opts.get("replay", "aa-mini-v1")
     tool_mode = opts.get("tool_mode", "none")
+    replay_extra = list(opts.get("replay_extra") or [])
     backend = probe["devices"][0]["backend"] if probe["devices"] else "cpu"
+    # Room on the device an evicted model has to fit into (the plan's budget for the largest device).
+    per_dev = plan["budget"].get("gpu_bytes_per_device") or []
+    capacity = max(per_dev) if per_dev else None
 
     sampler = MemorySampler(os.path.join(out_dir, "memory.jsonl"), probe["memory"]["topology"])
     sampler.start()
@@ -170,7 +196,7 @@ def run_residency(plan: dict, cat: dict, opts: dict, log=print) -> tuple[int, di
         "started": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "server": {"engine": "llama.cpp", "version": engine_version(),
                    "engines": {e: engines.version(e, cat) for e in sorted({x.get("engine") or "llama.cpp" for x in plan["selections"]})}},
-        "replay": {"name": replay, "tool_mode": tool_mode},
+        "replay": {"name": replay, "tool_mode": tool_mode, "extra_args": replay_extra},
         "resident": [s["model_id"] for s in sels if s["status"] in RESIDENT],
         "resident_coherent": [s["model_id"] for s in sels if s["status"] == "resident_coherent"],
         "placement": {s["model_id"]: dict(s["placement"], node=(node_of(s) or {}).get("hostname")) for s in sels},
@@ -210,14 +236,17 @@ def run_residency(plan: dict, cat: dict, opts: dict, log=print) -> tuple[int, di
                 srv = servers[mid]
                 if not write_attached_server(attached, model, (srv.spec or {}).get("argv") or llama_server_argv(s, srv.path, srv.alias, srv.port, extra), backend, engine=srv.engine):
                     attached = None
-                entry["replay"] = replay_once(srv, os.path.join(out_dir, f"replay-{mid}"), replay, tool_mode, attached)
+                entry["replay"] = replay_once(srv, os.path.join(out_dir, f"replay-{mid}"), replay, tool_mode, attached, replay_extra)
             else:
-                # Evict the largest resident server, load this one, run, restore.
-                victim_id = max(servers, key=lambda k: servers[k].sel["estimate"]["total_bytes"]) if servers else None
+                # Evict as many resident servers as it takes (largest first), load this one, run, restore them.
+                victims = pick_victims({k: v.sel["estimate"]["total_bytes"] for k, v in servers.items()},
+                                       s["estimate"]["total_bytes"], capacity)
+                entry["victims"] = victims
                 t0 = time.time()
-                if victim_id:
+                for victim_id in victims:
                     log(f"evicting {victim_id} to make room for {mid}")
                     servers[victim_id].stop()
+                victim_id = victims[0] if victims else None
                 victim_node = servers[victim_id].node if victim_id else None
                 tmp = Server(s, arts[mid]["path"], port, out_dir, extra, node=victim_node, cat=cat, device_total_bytes=dev_total)
                 try:
@@ -230,21 +259,22 @@ def run_residency(plan: dict, cat: dict, opts: dict, log=print) -> tuple[int, di
                 if load is not None:
                     if not write_attached_server(attached, model, (tmp.spec or {}).get("argv") or llama_server_argv(s, tmp.path, tmp.alias, tmp.port, extra), backend, engine=tmp.engine):
                         attached = None
-                    entry["replay"] = replay_once(tmp, os.path.join(out_dir, f"replay-{mid}"), replay, tool_mode, attached)
+                    entry["replay"] = replay_once(tmp, os.path.join(out_dir, f"replay-{mid}"), replay, tool_mode, attached, replay_extra)
                     tmp.stop()
-                if victim_id:
+                for victim_id in victims:
                     v = servers[victim_id]
-                    if not v.node:
+                    if not v.node and "restore_page_cache_bytes" not in entry:
                         entry["restore_page_cache_bytes"] = page_cache_resident_bytes(v.path)
                         entry["restore_file_bytes"] = os.path.getsize(v.path) if os.path.isfile(v.path) else None
-                    log(f"restoring {victim_id}" + (f" ({fmt_bytes(entry['restore_page_cache_bytes'])} of {fmt_bytes(entry.get('restore_file_bytes'))} in page cache)" if entry.get("restore_page_cache_bytes") is not None else ""))
+                    log(f"restoring {victim_id}" + (f" ({fmt_bytes(entry['restore_page_cache_bytes'])} of {fmt_bytes(entry.get('restore_file_bytes'))} in page cache)" if entry.get("restore_page_cache_bytes") is not None and victim_id == victims[0] else ""))
                     try:
-                        entry["restore_s"] = servers[victim_id].start(load_timeout)
+                        entry["restore_s"] = round((entry.get("restore_s") or 0) + v.start(load_timeout), 1)
                     except RuntimeError as e:
                         # a failed restore is a residency result (the swap did not round-trip), not a crash
                         entry["error"] = f"could not restore {victim_id}: {e}"
                         entry["restore_s"] = None
-                        servers[victim_id].stop()
+                        v.stop()
+                        break
                 entry["swap_s"] = round((time.time() - t0) - (entry.get("replay", {}).get("wall_s") or 0), 1)
                 result["swap_s_total"] = round(result["swap_s_total"] + entry["swap_s"], 1)
             rp = entry.get("replay") or {}

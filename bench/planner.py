@@ -421,7 +421,7 @@ def select_residency(cat: dict, preset_name: str, budget: dict, policy: dict) ->
             est = cost(model, f0, cat["engines"][f0["engines"][0]], ctx if model["modality"] in ("text", "vision") else 0, policy["n_seq"], policy["kv_quant"], tuple(budget["device_backends"]))
             sel = _selection(model["modality"], model, f0, f0["engines"][0], ctx, est,
                              {"strategy": "evicted", "devices": [], "gpu_layers": None, "host_bytes": 0,
-                              "fit_margin_bytes": -(est["total_bytes"] - max(remaining)), "status": "evicted"}, policy, budget)
+                              "fit_margin_bytes": max(budget["gpu_bytes_per_device"] or [0]) - est["total_bytes"], "status": "evicted"}, policy, budget)
             sels.append(sel)
     return sels, rejected
 
