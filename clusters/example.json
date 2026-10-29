@@ -1,0 +1,1 @@
+{"name": "example", "workers": [{"ssh": "worker1", "addr": "192.0.2.11", "rpc_port": 18052}]}

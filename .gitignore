@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+out/
+*.egg-info/
+.venv/
+# internal ops log, not part of the published suite
+STATUS.md

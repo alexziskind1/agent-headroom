@@ -1,0 +1,610 @@
+<title>Agent Headroom Explained</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Full-width scenes. Each scene = branded header, one sentence, an animated SVG stage, a facts row. Dark-first for video capture. */
+:root{
+  --bg:#0a0e13; --panel:#111820; --line:#223040; --fg:#e8eef4; --muted:#93a1b0;
+  --gpu:#39c6f2; --host:#f6a84b; --kv:#b58cff; --w:#3f86ff; --tool:#4fd98a; --bad:#ff5e6c; --ok:#4fd98a;
+  --display:"Sora",system-ui,sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){ --bg:#f5f7fa; --panel:#ffffff; --line:#d6dde6; --fg:#101820; --muted:#55657a; --gpu:#0a8fc0; --host:#c8700f; --kv:#7b4ee6; --w:#1f5fd6; --tool:#1f9e5a; --bad:#d6303f; --ok:#1f9e5a; color-scheme:light } }
+:root[data-theme="light"]{ --bg:#f5f7fa; --panel:#ffffff; --line:#d6dde6; --fg:#101820; --muted:#55657a; --gpu:#0a8fc0; --host:#c8700f; --kv:#7b4ee6; --w:#1f5fd6; --tool:#1f9e5a; --bad:#d6303f; --ok:#1f9e5a; color-scheme:light }
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.5;margin:0;padding-left:max(16px,env(safe-area-inset-left,0px),3vw);padding-right:max(16px,env(safe-area-inset-right,0px),3vw);padding-block:28px 72px}
+main{width:100%;max-width:none;margin:0}
+.hero{display:grid;gap:14px;margin-bottom:16px}
+.brand{display:flex;align-items:center;gap:16px}
+.brand .agent{font-family:var(--mono);font-weight:500;font-size:14px;letter-spacing:.36em;color:var(--tool);padding-left:2px}
+.brand .word{font-family:var(--display);font-weight:700;font-size:38px;letter-spacing:-.03em;line-height:1}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,4vw,48px);letter-spacing:-.02em;line-height:1.08;margin:6px 0 0;text-wrap:balance}
+h2{font-family:var(--display);font-weight:600;font-size:clamp(22px,2.6vw,30px);margin:0 0 6px;text-wrap:balance;display:flex;align-items:center;gap:12px}
+.ico{width:34px;height:34px;flex:none}
+.eyebrow{font-family:var(--mono);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;margin:0 0 8px}
+.eyebrow .lock{color:var(--fg)} .eyebrow .kick{color:var(--host)}
+.lead{font-size:19px;color:var(--muted);max-width:80ch;margin:0}
+section.scene{border-top:1px solid var(--line);padding-block:40px 36px;display:grid;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap}
+.head>div{max-width:92ch;min-width:0}
+.head p{margin:0;font-size:17px;color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px 14px;min-width:0}
+.panel svg{width:100%;height:auto;display:block;font-family:var(--mono);font-size:15px}
+.bar{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:13px;height:13px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+.ctl{display:flex;gap:10px;align-items:center;margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--muted);min-width:min(100%,360px)}
+.ctl button{font:inherit;background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 12px;cursor:pointer}
+.ctl button:focus-visible{outline:2px solid var(--gpu);outline-offset:2px}
+.ctl input[type=range]{flex:1;min-width:140px;accent-color:var(--gpu)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.fact{border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.fact b{display:block;font-family:var(--mono);font-size:26px;font-weight:500;font-variant-numeric:tabular-nums}
+.fact span{font-size:14px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:15px;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-weight:500;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td.y{color:var(--ok)} td.n{color:var(--muted)}
+code{font-family:var(--mono);font-size:.92em;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.kicker{font-family:var(--mono);font-size:13px;color:var(--muted);margin:10px 0 0}
+.eli{display:inline-flex;align-items:center;gap:6px;font:500 12px/1 var(--mono);color:var(--host);background:transparent;border:1px solid var(--host);border-radius:999px;padding:7px 13px;cursor:pointer;flex:none;margin-top:4px}
+.eli:hover,.eli[aria-expanded="true"],.eli[aria-pressed="true"]{background:var(--host);color:var(--bg)}
+.eli:focus-visible{outline:2px solid var(--gpu);outline-offset:2px}
+.eli.big{font-size:13px;padding:9px 15px;justify-self:start}
+.elibox{border-left:3px solid var(--host);background:var(--panel);border-radius:0 10px 10px 0;padding:12px 16px;font-size:17px;line-height:1.6;max-width:100ch}
+.elibox p{margin:0}
+@media (prefers-reduced-motion: reduce){ .ctl .auto{display:none} }
+</style>
+
+<main>
+<header class="hero">
+  <div class="brand">
+    <svg width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Agent Headroom mark"><rect x="2" y="2" width="60" height="60" rx="14" fill="var(--panel)" stroke="var(--line)" stroke-width="2"/><line x1="12" y1="14" x2="52" y2="14" stroke="var(--fg)" stroke-width="2" stroke-dasharray="4 3" stroke-linecap="round"/><rect x="14" y="40" width="9" height="12" rx="2" fill="var(--gpu)"/><rect x="27.5" y="30" width="9" height="22" rx="2" fill="var(--gpu)"/><rect x="41" y="22" width="9" height="30" rx="2" fill="var(--gpu)"/><rect x="41" y="15" width="9" height="6" rx="1.5" fill="var(--host)"/></svg>
+    <div><div class="agent">AGENT</div><div class="word">HEADROOM</div></div>
+  </div>
+  <h1>How much agentic work can this machine hold?</h1>
+  <p class="lead">Token speed cannot tell a 128 GB box from a 192 GB box. Agents can: long contexts, many sessions, tools on the CPU, several models kept warm. Five tests, five separate answers, every number from a real run.</p>
+  <button class="eli big" type="button" id="eli-all" aria-pressed="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain everything like I'm 10</button>
+</header>
+
+<!-- ============ 0. PIPELINE ============ -->
+<section class="scene" id="pipeline">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span>Part 0 · pipeline</span></p>
+      <h2>Five stages, one command each</h2>
+      <p>Probe the machine, read the catalog, plan a workload that fits, run it, report. Nothing downloads or launches before <code>run</code>.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-pipeline" aria-expanded="false" aria-controls="eli-pipeline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-pipeline" hidden><p>First we look at the computer and count its memory. Then we open a list of AI brains with how big each one is. We pick the biggest brains that fit, like packing a suitcase. Then we actually run them and time everything. Then we write down what happened in a table. Packing (the plan) is just math on two small files, so it never downloads anything. Give it a probe file from another computer and it tells you what that computer would run before you buy it.</p></div>
+  <div class="panel"><svg id="svg-pipeline" viewBox="0 0 1400 260" role="img" aria-label="Pipeline: probe, catalog, plan, run, report"></svg>
+    <div class="bar"><div class="ctl"><button data-replay="pipeline">Replay</button><input type="range" id="rng-pipeline" min="0" max="1000" value="0" aria-label="scrub"><span class="auto">loops while visible</span></div></div>
+  </div>
+</section>
+
+<!-- ============ 1. PROBE ============ -->
+<section class="scene" id="probe">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span>Part 1 · probe</span></p>
+      <h2>Where the memory actually is</h2>
+      <p>Two pools or one. The probe asks the device, never compares sizes, and the planner leaves room for the OS and the tools.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-probe" aria-expanded="false" aria-controls="eli-probe"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-probe" hidden><p>Some computers have two memory boxes: one glued to the graphics card and one for everything else. Others have one big box that both share. We find out which kind by asking the chip directly, not by guessing from the sizes, because a 96 GB card next to 92 GB of normal memory looks like one box and isn't. We also always leave some space empty so the computer can breathe and run its tools.</p></div>
+  <div class="panel"><svg id="svg-probe" viewBox="0 0 1400 390" role="img" aria-label="Discrete versus unified memory pools"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--gpu)"></i>GPU budget</span><span><i style="background:var(--host)"></i>host RAM</span><span><i style="background:var(--muted)"></i>reserve / floor</span></div>
+    <div class="ctl"><button data-replay="probe">Replay</button><input type="range" id="rng-probe" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+</section>
+
+<!-- ============ 2. PLANNER ============ -->
+<section class="scene" id="planner">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span>Part 2 · planner</span></p>
+      <h2>Cost a model, then grow the context</h2>
+      <p>Weights plus KV cache plus activations plus overhead, largest model first. The first that fits gets its context grown until the budget is full.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-planner" aria-expanded="false" aria-controls="eli-planner"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-planner" hidden><p>An AI model needs room for three things: its brain (the weights), its memory of the conversation so far (the KV cache), and some scratch paper. We add those up for each model. We try the biggest brain first. If it doesn't fit, we try the next smaller one. When one fits, we keep making its conversation memory longer and longer until the box is full. That's how we find the biggest thing the computer can really do.</p></div>
+  <div class="panel"><svg id="svg-planner" viewBox="0 0 1400 340" role="img" aria-label="Planner stacking weights, KV, activations and overhead into the budget"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--w)"></i>weights</span><span><i style="background:var(--kv)"></i>KV cache</span><span><i style="background:var(--tool)"></i>activations</span><span><i style="background:var(--muted)"></i>engine overhead</span></div>
+    <div class="ctl"><button data-replay="planner">Replay</button><input type="range" id="rng-planner" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+</section>
+
+<!-- ============ TEST 1. RUNG (ladder) ============ -->
+<section class="scene" id="ladder">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span class="lock">Agent Headroom · Rung</span><span class="kick">size headroom</span><span>test 1 · ladder</span></p>
+      <h2><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18M17 3v18"/><path d="M7 7h10M7 17h10"/><path d="M7 12h10" stroke="#f6a84b" stroke-width="2.4"/><rect x="9.5" y="8.5" width="5" height="3" rx="0.8" fill="#3f86ff" stroke="none"/></svg>Which rung can you reach?</h2>
+      <p>The largest model and the longest context the machine holds, before any speed number. Same rung, different speed is a GPU story. Different rung is a memory story.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-ladder" aria-expanded="false" aria-controls="eli-ladder"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-ladder" hidden><p>Picture a ladder of AI models from tiny at the bottom to enormous at the top. Each computer climbs as high as it can. The first question is simply: which rung did you reach? Only after that do we ask how fast you ran on that rung.</p></div>
+  <div class="panel"><svg id="svg-ladder" viewBox="0 0 1400 430" role="img" aria-label="Models descending a ladder until one fits each machine"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--ok)"></i>fits</span><span><i style="background:var(--bad)"></i>too big</span></div>
+    <div class="ctl"><button data-replay="ladder">Replay</button><input type="range" id="rng-ladder" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+  <div class="facts">
+    <div class="fact"><b>Ling · 131K</b><span>GB10 128 GB and Ryzen 192 GB reach the same rung</span></div>
+    <div class="fact"><b>DeepSeek-V4-Pro · 131K</b><span>DGX Station GB300, 433 GiB model, 57% in host RAM</span></div>
+    <div class="fact"><b>9B · 61K</b><span>M4 16 GB, four rungs lower</span></div>
+  </div>
+</section>
+
+<!-- ============ TEST 2. PACE (inference) ============ -->
+<section class="scene" id="inference">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span class="lock">Agent Headroom · Pace</span><span class="kick">speed headroom</span><span>test 2 · inference</span></p>
+      <h2><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="M5 12h3l2-4 3 8 2-4h4" stroke="#39c6f2" stroke-width="2.2"/></svg>One frozen agent session, replayed everywhere</h2>
+      <p>AgentPerf's recorded coding session: 8 tasks, 168 turns, 172 tool calls, context growing to 65K. Same model, same flags, same trajectory on every machine.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-inference" aria-expanded="false" aria-controls="eli-inference"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-inference" hidden><p>We recorded a real AI coding helper doing 8 jobs: reading files, running commands, fixing code, 168 turns of back-and-forth. Then we replay that exact recording on every computer and time it, like making every runner run the same race course. This gives the usual speed number. It's important, but it's only one of our five tests.</p></div>
+  <div class="panel"><svg id="svg-inference" viewBox="0 0 1400 400" role="img" aria-label="Agent turns growing context with tool calls, and decode speed per machine"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--kv)"></i>context in KV</span><span><i style="background:var(--tool)"></i>tool call</span><span><i style="background:var(--gpu)"></i>tokens streamed</span></div>
+    <div class="ctl"><button data-replay="inference">Replay</button><input type="range" id="rng-inference" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+  <div class="facts">
+    <div class="fact"><b>88.8</b><span>tok/s · DGX Station GB300, 8.1 min</span></div>
+    <div class="fact"><b>75.1</b><span>tok/s · RTX PRO 6000, 8.3 min</span></div>
+    <div class="fact"><b>11.6</b><span>tok/s · GB10 128 GB, 50.4 min</span></div>
+    <div class="fact"><b>11.0</b><span>tok/s · Ryzen AI Max+ 192 GB, 69.5 min</span></div>
+  </div>
+</section>
+
+<!-- ============ TEST 3. CROWD (host_pressure) ============ -->
+<section class="scene" id="pressure">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span class="lock">Agent Headroom · Crowd</span><span class="kick">concurrency headroom</span><span>test 3 · host_pressure</span></p>
+      <h2><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 3v18" stroke-width="2"/><circle cx="5" cy="6" r="2" fill="#4fd98a" stroke="none"/><circle cx="11" cy="6" r="2" fill="#4fd98a" stroke="none"/><circle cx="5" cy="12" r="2" fill="#4fd98a" stroke="none"/><circle cx="11" cy="12" r="2" fill="#4fd98a" stroke="none"/><circle cx="16.5" cy="12" r="2" fill="#4fd98a" stroke="none"/><circle cx="5" cy="18" r="2" fill="#4fd98a" stroke="none"/><circle cx="11" cy="18" r="2" fill="#4fd98a" stroke="none"/><circle cx="16.5" cy="18" r="2" fill="#ff5e6c" stroke="none"/></svg>Add agents until the machine gives</h2>
+      <p>1, 2, 4, 8, 16 agents against one server, each with a 65K KV slot on the GPU and real tool containers on the host. The last clean level is the answer.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-pressure" aria-expanded="false" aria-controls="eli-pressure"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-pressure" hidden><p>Now we ask the computer to help 1 person, then 2, then 4, then 8 people all at once. Every extra person needs memory on the graphics card for their conversation and extra room on the normal side for their tools. We keep adding people until it gets slow or falls over. A fast graphics card with a weak 'everything else' side gets stuck early. That's how we see what normal memory and CPU are worth.</p></div>
+  <div class="panel"><svg id="svg-pressure" viewBox="0 0 1400 440" role="img" aria-label="Agents added to GPU and host, with aggregate throughput curves"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--kv)"></i>KV slot per agent</span><span><i style="background:var(--host)"></i>client</span><span><i style="background:var(--tool)"></i>tool containers</span></div>
+    <div class="ctl"><button data-replay="pressure">Replay</button><input type="range" id="rng-pressure" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+  <div class="facts">
+    <div class="fact"><b>2</b><span>agents before throughput falls · RTX PRO 6000 + 92 GB, 8 cores</span></div>
+    <div class="fact"><b>8</b><span>agents, all clean · GB10 128 GB, 20 cores; host RAM 102 GB at 8</span></div>
+    <div class="fact"><b>2</b><span>agents · Ryzen 192 GB with 32 GB host left after the carve-out; a turn drops at 4</span></div>
+    <div class="fact"><b>16</b><span>agents · DGX Station, 744 GB host; aggregate peaks at 4</span></div>
+  </div>
+</section>
+
+<!-- ============ TEST 4. TENANTS (residency) ============ -->
+<section class="scene" id="residency">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span class="lock">Agent Headroom · Tenants</span><span class="kick">model headroom</span><span>test 4 · residency</span></p>
+      <h2><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="#3f86ff" stroke="none"/><rect x="13" y="3" width="8" height="8" rx="1.5" fill="#3f86ff" stroke="none"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="#3f86ff" stroke="none"/><rect x="13" y="13" width="8" height="8" rx="1.5" stroke="#ff5e6c" stroke-dasharray="2.5 2"/><path d="M15.5 19.5l3-3M18.5 19.5l-3-3" stroke="#ff5e6c"/></svg>Keep four models warm. Or don't.</h2>
+      <p>Four models loaded together, tasks cycling across them. A model that does not fit is evicted and reloaded, never substituted, so the swap cost is measured.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-residency" aria-expanded="false" aria-controls="eli-residency"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-residency" hidden><p>Imagine four toys you play with one after another. If your toy box fits all four, you grab the next one instantly. If it only fits three, every time you want the fourth toy you have to put one away and dig the other out of the closet. That digging takes 79 seconds here. The computer with the bigger box wins the day even though both play with each toy at exactly the same speed.</p></div>
+  <div class="panel"><svg id="svg-residency" viewBox="0 0 1400 450" role="img" aria-label="Four models resident on a 192 GB box versus eviction on a 128 GB box"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--w)"></i>resident model</span><span><i style="background:var(--kv)"></i>32K KV</span><span><i style="background:var(--bad)"></i>reloading</span><span><i style="background:var(--tool)"></i>task running</span></div>
+    <div class="ctl"><button data-replay="residency">Replay</button><input type="range" id="rng-residency" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+  <div class="facts">
+    <div class="fact"><b>0.60</b><span>tasks/min · 192 GB, 4 resident, no swap</span></div>
+    <div class="fact"><b>0.54</b><span>tasks/min · 128 GB, 3 resident, 79 s swap</span></div>
+    <div class="fact"><b>3.19</b><span>tasks/min · DGX Station, 4 resident at 90 to 240 tok/s each</span></div>
+  </div>
+</section>
+
+<!-- ============ TEST 5. RECALL (warm_contexts) ============ -->
+<section class="scene" id="warm">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span class="lock">Agent Headroom · Recall</span><span class="kick">context headroom</span><span>test 5 · warm_contexts</span></p>
+      <h2><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7" height="5" rx="1.2" fill="#39c6f2" stroke="none"/><rect x="3" y="12" width="18" height="3" rx="1" fill="#b58cff" stroke="none"/><rect x="3" y="17" width="18" height="3" rx="1" fill="#b58cff" stroke="none"/><path d="M16 11V5M13.5 7.5L16 5l2.5 2.5" stroke="#f6a84b" stroke-width="2"/></svg>How many agents can RAM keep in mind?</h2>
+      <p>Eight GPU slots, a fleet of n agents sharing them. Between turns an agent's whole context parks in host RAM. Past the point where RAM is full, every extra agent re-reads its context from scratch each turn.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-warm" aria-expanded="false" aria-controls="eli-warm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-warm" hidden><p>Imagine a teacher helping a whole class, one student at a time. The teacher can only hold a few students' homework on the desk (the GPU). Everyone else's homework waits on a shelf (the RAM). If the shelf is big enough, picking up the next student's work is instant. If it is too small, the teacher has to re-read that student's whole notebook from the start every single time. More shelf, more students, same teacher.</p></div>
+  <div class="panel"><svg id="svg-warm" viewBox="0 0 1400 400" role="img" aria-label="Agent contexts filling a host RAM cache on a 128 GB and a 256 GB box"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--gpu)"></i>GPU slot</span><span><i style="background:var(--kv)"></i>context warm in RAM</span><span><i style="background:var(--bad)"></i>evicted · re-prefill every turn</span></div>
+    <div class="ctl"><button data-replay="warm">Replay</button><input type="range" id="rng-warm" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+  <div class="facts">
+    <div class="fact"><b>16 → 34 → 278</b><span>knee in agents at 128 GB, 256 GB, 2 TB of host RAM (planner)</span></div>
+    <div class="fact"><b>0.66 vs 0.32</b><span>prompt-cache hit ratio with and without the host cache (smoke run)</span></div>
+    <div class="fact"><b>0.4 s vs 1.5 s</b><span>context restored from RAM vs re-prefilled</span></div>
+  </div>
+</section>
+
+<!-- ============ BRIDGE (coherent) ============ -->
+<section class="scene" id="coherent">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span class="lock">Agent Headroom · Bridge</span><span class="kick">coherent memory</span><span>DGX Station GB300, measured</span></p>
+      <h2><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="8" width="6" height="8" rx="1.5" fill="#39c6f2" stroke="none"/><rect x="13" y="5" width="8.5" height="14" rx="1.5" fill="#f6a84b" stroke="none"/><path d="M8.5 11h4.5M8.5 13h4.5"/></svg>Two memories the GPU can both read</h2>
+      <p>HBM on the GPU, LPDDR on the CPU, one address space over NVLink-C2C. KV and activations stay in HBM, weights fill the rest and spill into the host tier.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-coherent" aria-expanded="false" aria-controls="eli-coherent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-coherent" hidden><p>Some new machines have two kinds of memory: a small super-fast one glued to the chip, and a big slower one sitting next to it. The chip can read both directly. We put the parts the model touches on every single word into the fast memory, and let the rest of the model overflow into the big one. We measure how fast each memory is, so we can predict the slowdown before we run anything.</p></div>
+  <div class="panel"><svg id="svg-coherent" viewBox="0 0 1400 360" role="img" aria-label="Weights spilling from HBM into coherent host memory"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--w)"></i>weights</span><span><i style="background:var(--kv)"></i>KV + activations</span><span><i style="background:var(--muted)"></i>reserve</span></div>
+    <div class="ctl"><button data-replay="coherent">Replay</button><input type="range" id="rng-coherent" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+  <div class="facts">
+    <div class="fact"><b>4.37</b><span>tok/s · 433 GiB DeepSeek-V4-Pro, 57% spilled, 168/168 turns</span></div>
+    <div class="fact"><b>6134 / 388</b><span>GB/s · HBM vs the NVLink-C2C link, both measured by the probe</span></div>
+  </div>
+</section>
+
+<!-- ============ FLEET (cluster) ============ -->
+<section class="scene" id="cluster">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span class="lock">Agent Headroom · Fleet</span><span class="kick">clusters</span></p>
+      <h2><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5L5.5 17.5h13z"/><circle cx="12" cy="6" r="2.4" fill="#4fd98a" stroke="none"/><circle cx="5.5" cy="17.5" r="2.4" fill="#4fd98a" stroke="none"/><circle cx="18.5" cy="17.5" r="2.4" fill="#4fd98a" stroke="none"/></svg>Several machines, one benchmark</h2>
+      <p>The cluster probe measures every node and every link. Models go whole onto one node each, or one model is sliced across nodes and every token crosses the wire.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-cluster" aria-expanded="false" aria-controls="eli-cluster"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-cluster" hidden><p>When one computer is too small, we chain a few together with a cable. First we measure how fast that cable is. Then there are two ways to use the team: give each computer its own whole model, so nothing crosses the cable while they work, or cut one giant model into slices across all of them, so every single word has to cross the cable. The benchmark tells you which one you got and what the cable cost you.</p></div>
+  <div class="panel"><svg id="svg-cluster" viewBox="0 0 1400 330" role="img" aria-label="Two nodes: models spread per node, or one model split with tokens crossing the link"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--w)"></i>model</span><span><i style="background:var(--tool)"></i>token crossing the link</span></div>
+    <div class="ctl"><button data-replay="cluster">Replay</button><input type="range" id="rng-cluster" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+</section>
+
+<!-- ============ TRACKS (engines) ============ -->
+<section class="scene" id="engines">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span class="lock">Agent Headroom · Tracks</span><span class="kick">engine rows</span></p>
+      <h2><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18" stroke-width="2.4"/><path d="M3 15h18" stroke="#39c6f2" stroke-width="2.4"/><path d="M7 6.5v5M12 6.5v5M17 6.5v5M7 12.5v5M12 12.5v5M17 12.5v5" stroke="#93a1b0" stroke-width="1"/></svg>The baseline, and the fastest thing you would actually run</h2>
+      <p>llama.cpp with identical flags on every box, plus the engine people really use on that platform: vLLM on CUDA, MLX or TensorFold on a Mac. Same model, same replay, two rows.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-engines" aria-expanded="false" aria-controls="eli-engines"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-engines" hidden><p>Every computer gets the same careful test with the same program (llama.cpp), so we can compare them fairly. But nobody runs the slowest program on purpose. So each computer also gets a second score with the fastest program it has. Same model, same questions, two scores: the fair one and the fast one.</p></div>
+  <div class="panel"><svg id="svg-engines" viewBox="0 0 1400 320" role="img" aria-label="Decode speed bars: llama.cpp baseline versus the best engine on the same machine"></svg>
+    <div class="bar"><div class="legend"><span><i style="background:var(--w)"></i>llama.cpp baseline</span><span><i style="background:var(--gpu)"></i>best engine on this platform</span></div>
+    <div class="ctl"><button data-replay="engines">Replay</button><input type="range" id="rng-engines" min="0" max="1000" value="0" aria-label="scrub"></div></div>
+  </div>
+  <div class="facts">
+    <div class="fact"><b>71 → 109 → 169</b><span>tok/s · GB10, Nemotron 30B-A3B: llama.cpp → vLLM → TensorFold</span></div>
+    <div class="fact"><b>89 → 135</b><span>tok/s · DGX Station, Qwen3.8-27B: llama.cpp Q4 → vLLM FP8</span></div>
+    <div class="fact"><b>17.7 → 20.0</b><span>tok/s · M4 16 GB, Qwen3.5-9B: llama.cpp → MLX</span></div>
+  </div>
+</section>
+
+<!-- ============ COMPARISON ============ -->
+<section class="scene" id="different">
+  <div class="head">
+    <div>
+      <p class="eyebrow"><span>What is different</span></p>
+      <h2>Five answers, no composite score</h2>
+      <p>Speed benchmarks measure one model at fixed settings. Agent evals score the model, which is the same on any box that runs it. Agent Headroom starts from the machine's memory and reports where it runs out.</p>
+    </div>
+    <button class="eli" type="button" id="eli-btn-different" aria-expanded="false" aria-controls="eli-different"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.6l.1.5h4.8l.1-.5c.1-.5.4-1.1 1-1.6A6 6 0 0 0 12 3z"/></svg> Explain it like I'm 10</button>
+  </div>
+  <div class="elibox" id="eli-different" hidden><p>Other tests ask 'how fast?' or 'how smart is the AI?'. Ours asks 'how much can this computer hold, and what happens when it's full?'. It gives five separate answers: what fits, how fast, how many helpers at once, how many models stay loaded, how many helpers' memories stay warm. We don't mush them into one score, because the whole point is to see where they differ.</p></div>
+  <div class="panel tablewrap">
+    <table>
+      <thead><tr><th>capability</th><th>llama-bench / MLPerf</th><th>AgentPerf-Local</th><th>SWE-bench, tau-bench</th><th>Agent Headroom</th></tr></thead>
+      <tbody>
+        <tr><td>real agent trajectory with tools</td><td class="n">no</td><td class="y">yes</td><td class="y">yes (live model)</td><td class="y">yes (AgentPerf replay)</td></tr>
+        <tr><td>measures hardware, not model IQ</td><td class="y">yes</td><td class="y">yes</td><td class="n">no</td><td class="y">yes</td></tr>
+        <tr><td>plans the workload from probed memory</td><td class="n">no</td><td class="n">no</td><td class="n">no</td><td class="y">yes</td></tr>
+        <tr><td>Rung · largest model and context that fit</td><td class="n">no</td><td class="n">no</td><td class="n">no</td><td class="y">yes</td></tr>
+        <tr><td>Crowd · concurrency sweep to failure</td><td class="n">no</td><td class="n">no</td><td class="n">no</td><td class="y">yes</td></tr>
+        <tr><td>Tenants · multi-model residency with measured swap</td><td class="n">no</td><td class="n">no</td><td class="n">no</td><td class="y">yes</td></tr>
+        <tr><td>Recall · agent contexts kept warm in host RAM</td><td class="n">no</td><td class="n">no</td><td class="n">no</td><td class="y">yes</td></tr>
+        <tr><td>sees system RAM separately from VRAM</td><td class="n">no</td><td class="n">partly</td><td class="n">no</td><td class="y">yes</td></tr>
+        <tr><td>same suite from 16 GB to a rack</td><td class="y">yes</td><td class="n">one model</td><td class="n">n/a</td><td class="y">open catalog</td></tr>
+        <tr><td>coherent memory and clusters</td><td class="n">no</td><td class="n">no</td><td class="n">no</td><td class="y">Bridge, Fleet</td></tr>
+      </tbody>
+    </table>
+    <p class="kicker">Limits today: engine rows use the recorded output policy; residency is text-only; clusters are llama.cpp RPC only; coherent mode is measured on one DGX Station with naive spill; Recall has run as a smoke only, the 128 vs 256 GB sweep is pending.</p>
+  </div>
+</section>
+</main>
+
+<script>
+(function(){
+"use strict";
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = () => ({gpu:css('--gpu'),host:css('--host'),kv:css('--kv'),w:css('--w'),tool:css('--tool'),bad:css('--bad'),ok:css('--ok'),muted:css('--muted'),fg:css('--fg'),line:css('--line'),panel:css('--panel')});
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const seg=(t,a,b)=>clamp((t-a)/(b-a),0,1);
+const ease=x=>x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const scenes = {};
+const SORA='font-family="Sora" font-weight="600"';
+
+function rect(x,y,w,h,fill,extra=''){return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(0,w).toFixed(1)}" height="${h.toFixed(1)}" fill="${fill}" ${extra}/>`;}
+function txt(x,y,s,extra=''){return `<text x="${x}" y="${y}" fill="currentColor" ${extra}>${s}</text>`;}
+function mut(x,y,s,extra=''){const c=C();return `<text x="${x}" y="${y}" fill="${c.muted}" ${extra}>${s}</text>`;}
+function title(s){return txt(50,40,s,`font-size="20" ${SORA}`);}
+
+/* ---------- 0. pipeline ---------- */
+scenes.pipeline = {dur:7000, draw(t){
+  const c=C(); const steps=[['probe','probe.json','what memory is where'],['catalog','catalog.json','models with real byte counts'],['plan','plan.json','dry run: fits or refuses'],['run','results.json','server, replay, memory trace'],['report','REPORT.md','one table per test']];
+  let s='';
+  steps.forEach((st,i)=>{
+    const x=50+i*265, on=seg(t,i*.18,i*.18+.12);
+    const col=[c.gpu,c.w,c.kv,c.tool,c.host][i];
+    s+=rect(x,50,230,90,c.panel,`stroke="${on>0?col:c.line}" stroke-width="3" rx="12"`);
+    s+=txt(x+115,107,st[0],`text-anchor="middle" font-size="30" ${SORA} opacity="${.35+.65*on}"`);
+    if(i<4){const a=seg(t,i*.18+.1,i*.18+.18); s+=`<line x1="${x+232}" y1="95" x2="${x+232+24*a}" y2="95" stroke="${col}" stroke-width="3"/>`; if(a>.95) s+=`<path d="M${x+254},87 l11,8 l-11,8z" fill="${col}"/>`;}
+    const o=seg(t,i*.18+.08,i*.18+.2);
+    s+=`<g opacity="${o}">`+txt(x+115,178,st[1],`text-anchor="middle" font-size="16" fill="${col}"`)+mut(x+115,204,st[2],`text-anchor="middle" font-size="14"`)+'</g>';
+  });
+  s+=mut(700,244,'plan is always a dry run · run re-probes and refuses on drift',`text-anchor="middle" font-size="14" opacity="${seg(t,.85,1)}"`);
+  return s;
+}};
+
+/* ---------- 1. probe ---------- */
+scenes.probe = {dur:7000, draw(t){
+  const c=C(); let s=''; const X=50, sc=5.5;
+  const fill=ease(seg(t,0,.3));
+  s+=txt(X,40,'discrete · RTX PRO 6000 + Ryzen 9700X',`font-size="20" ${SORA}`);
+  s+=mut(X,70,'GPU 96 GB','font-size="14"'); s+=rect(X,78,96*sc,40,c.line,'rx="6"'); s+=rect(X,78,96*sc*fill,40,c.gpu,'rx="6"');
+  const r1=seg(t,.35,.5); s+=rect(X+96*sc-9.6*sc*r1,78,9.6*sc*r1,40,c.muted,'rx="6"'); if(r1>.9) s+=mut(X+96*sc+14,103,'10% reserve → budget 86.4 GiB','font-size="15"');
+  s+=mut(X,148,'system RAM 92 GB','font-size="14"'); s+=rect(X,156,92*sc,40,c.line,'rx="6"'); s+=rect(X,156,92*sc*fill,40,c.host,'rx="6"');
+  if(r1>.9) s+=mut(X+92*sc+14,181,'tools, clients and the OS live here','font-size="15"');
+  const y0=250;
+  s+=txt(X,y0,'unified · GB10 128 GB',`font-size="20" ${SORA}`);
+  s+=mut(X,y0+30,'one pool 119.6 GiB','font-size="14"');
+  s+=rect(X,y0+38,119.6*sc,40,c.line,'rx="6"'); s+=rect(X,y0+38,119.6*sc*fill,40,c.gpu,'rx="6"');
+  const r2=seg(t,.6,.78); const fl=16*sc*r2; s+=rect(X+119.6*sc-fl,y0+38,fl,40,c.host,'rx="6"');
+  if(r2>.9) s+=mut(X+119.6*sc+14,y0+63,'host floor 16 GiB → GPU budget 103.6 GiB','font-size="15"');
+  s+=mut(X,y0+118,'decided by the device integrated flag, never by size',`font-size="14" opacity="${seg(t,.85,1)}"`);
+  return s;
+}};
+
+/* ---------- 2. planner ---------- */
+scenes.planner = {dur:9000, draw(t){
+  const c=C(); let s='';
+  const budget=103.6, X=50, W=1300, px=W/120, Y=110, H=70;
+  s+=title('GB10 · budget 103.6 GiB · grow the context until the box is full');
+  s+=rect(X,Y,budget*px,H,c.line,'rx="6"'); s+=`<line x1="${X+budget*px}" y1="${Y-14}" x2="${X+budget*px}" y2="${Y+H+14}" stroke="${c.fg}" stroke-width="2" stroke-dasharray="6 4"/>`;
+  s+=mut(X+budget*px,Y-22,'budget','font-size="14" text-anchor="middle"');
+  if(t<.3){
+    const w=Math.min(230*px*ease(seg(t,0,.18)),W); s+=rect(X,Y,w,H,c.w,'rx="6"'); s+=txt(X+14,Y+43,'DeepSeek-V4-Pro Q4 · 230 GiB of weights',`font-size="17"`);
+    if(t>.2) s+=`<text x="${X+budget*px+16}" y="${Y+43}" fill="${c.bad}" font-size="18" font-weight="500">does not fit → next</text>`;
+  } else {
+    const wt=71.7*ease(seg(t,.3,.45)); s+=rect(X,Y,wt*px,H,c.w,'rx="6"'); s+=txt(X+14,Y+43,'Ling-3.0-flash Q4 · 71.7 GiB',`font-size="17"`);
+    const ov=4*ease(seg(t,.45,.5)); s+=rect(X+wt*px,Y,ov*px,H,c.muted);
+    const act=3.6*ease(seg(t,.5,.55)); s+=rect(X+(wt+ov)*px,Y,act*px,H,c.tool);
+    const steps=[[131072,true],[196608,false],[163840,false],[147456,false],[139264,false],[135168,false],[131072,true]];
+    const p=seg(t,.58,.95); const k=Math.min(steps.length-1,Math.floor(p*steps.length));
+    const ctx=p>=1?131072:steps[k][0]; const kvG=ctx/4096*0.5;
+    const fits=(wt+ov+act+kvG)<=budget;
+    s+=rect(X+(wt+ov+act)*px,Y,kvG*px,H,fits?c.kv:c.bad);
+    s+=txt(X+(wt+ov+act)*px+8,Y+H+30,`KV at ${(ctx/1024).toFixed(0)}K context${fits?'':' · too big, halve the step'}`,`font-size="16" fill="${fits?c.kv:c.bad}"`);
+    if(p>=1) s+=`<text x="${X}" y="${Y+H+76}" fill="${c.ok}" font-size="20" font-weight="500">fits · Ling-3.0-flash Q4 · 131,072 context · measured peak 92.8 GiB</text>`;
+    s+=mut(X,Y+H+112,'cost = weights + KV cache + activations + engine overhead · KV shape from the catalog, not from parameter count','font-size="14"');
+  }
+  return s;
+}};
+
+/* ---------- RUNG · ladder ---------- */
+scenes.ladder = {dur:9000, draw(t){
+  const c=C(); let s='';
+  s+=title('largest model that fits, then longest context');
+  const rungs=[['DeepSeek-V4-Pro Q4',230],['Ling-3.0-flash Q4 · 124B MoE',77],['Qwen3.6-35B-A3B Q4',22],['Qwen3.8-27B Q4',17],['Qwen3.5-9B Q4',6]];
+  const machines=[['M4 16 GB',10.9,'9B at 61K · 16.1 tok/s'],['RTX PRO 6000 96 GB',86.4,'Ling fits · not run (disk)'],['GB10 128 GB',103.6,'Ling at 131K · 45.2 tok/s'],['Ryzen 192 GB',144,'Ling at 131K · 40.5 tok/s']];
+  const x0=50, rx=500;
+  rungs.forEach((r,i)=>{ const y=90+i*62; s+=`<line x1="${x0}" y1="${y}" x2="${x0+380}" y2="${y}" stroke="${c.line}" stroke-width="3"/>`; s+=txt(x0,y-10,r[0],'font-size="16"'); s+=mut(x0+390,y+5,r[1]+' GiB','font-size="14"'); });
+  const p=seg(t,.05,.9);
+  machines.forEach((m,j)=>{
+    const x=rx+j*225; s+=txt(x,70,m[0],`font-size="17" ${SORA}`); s+=mut(x,92,'budget '+m[1]+' GiB','font-size="14"');
+    const fitIdx=rungs.findIndex(r=>r[1]+4<=m[1]);
+    const mp=clamp(p*5-j*0.4,0,fitIdx+1); const idx=Math.min(fitIdx,Math.floor(mp));
+    for(let i=0;i<=idx;i++){ const y=90+i*62; const ok=i===fitIdx&&mp>=fitIdx; s+=`<circle cx="${x+70}" cy="${y+22}" r="12" fill="${ok?c.ok:c.bad}" opacity="${i===idx?1:.35}"/>`; if(i<fitIdx) s+=mut(x+90,y+27,'too big','font-size="13"'); }
+    if(mp>=fitIdx+0.99) s+=`<text x="${x}" y="392" fill="${c.ok}" font-size="15" font-weight="500">${m[2]}</text>`;
+  });
+  s+=mut(50,420,'same rung, different speed: a GPU story · different rung: a memory story',`font-size="14" opacity="${seg(t,.9,1)}"`);
+  return s;
+}};
+
+/* ---------- PACE · inference ---------- */
+scenes.inference = {dur:10000, draw(t){
+  const c=C(); let s=''; const X=50, W=1240;
+  s+=title('AgentPerf replay · 8 tasks · 168 turns · 172 tool calls · context grows to 65K');
+  const Y=80, turns=24, p=seg(t,.05,.7)*turns;
+  s+=mut(X,Y-8,'context held in the KV cache','font-size="14"');
+  s+=rect(X,Y,W,26,c.line,'rx="5"');
+  const ctx=Math.min(65536, 2000+Math.pow(p/turns,1.4)*63536);
+  s+=rect(X,Y,W*ctx/65536,26,c.kv,'rx="5"'); s+=txt(X+W*ctx/65536+10,Y+19,`${(ctx/1024).toFixed(0)}K`,`font-size="16" fill="${c.kv}"`);
+  const ty=140; s+=mut(X,ty-8,'turns · tokens stream, then a tool runs, then the next turn','font-size="14"');
+  const cw=W/turns;
+  for(let i=0;i<turns;i++){
+    const x=X+i*cw, on=i<p, tool=i%3===2;
+    s+=rect(x,ty,cw-6,34,on?(tool?c.tool:c.gpu):c.line,`rx="4" opacity="${on?1:.5}"`);
+    if(on&&!tool){ const n=Math.floor(seg(p-i,0,1)*6); for(let d=0;d<n;d++) s+=`<circle cx="${x+8+d*8}" cy="${ty+17}" r="3" fill="${c.panel}"/>`; }
+  }
+  const by=215; s+=mut(X,by,'same replay · decode tok/s · Qwen3.8-27B Q4 at 65K (the Mac runs the 9B at 61K)','font-size="14"');
+  const rows=[['RTX PRO 6000 96 GB',75.1,c.host],['GB10 128 GB unified',11.6,c.gpu],['Ryzen AI Max+ 192 GB',11.0,c.gpu],['M4 16 GB (9B)',16.1,c.kv]];
+  const r=ease(seg(t,.72,.95));
+  rows.forEach((row,i)=>{ const y=by+16+i*42; s+=mut(X,y+21,row[0],'font-size="15"'); const bw=(W-340)*row[1]/80*r; s+=rect(X+260,y,bw,30,row[2],'rx="5"'); s+=txt(X+270+bw,y+21,(row[1]*r).toFixed(1),'font-size="17" font-weight="500"'); });
+  return s;
+}};
+
+/* ---------- CROWD · host pressure ---------- */
+scenes.pressure = {dur:10000, draw(t){
+  const c=C(); let s='';
+  s+=title('N agents at once · 65K context each · live Docker tools');
+  const levels=[1,2,4,8]; const li=Math.min(3,Math.floor(seg(t,.05,.6)*4)); const n=levels[li];
+  s+=mut(50,80,`GPU · model + ${n} KV slot${n>1?'s':''}`,'font-size="14"');
+  s+=rect(50,88,520,130,c.line,'rx="10"'); s+=rect(56,94,150,118,c.w,'rx="6"'); s+=txt(131,158,'weights',`text-anchor="middle" font-size="14" fill="${c.panel}"`);
+  for(let i=0;i<n;i++){ const col=i%4, rw=Math.floor(i/4); s+=rect(216+col*86,94+rw*60,80,54,c.kv,'rx="6"'); }
+  s+=mut(50,252,`host RAM · ${n} client${n>1?'s':''} + tool containers`,'font-size="14"');
+  s+=rect(50,260,520,130,c.line,'rx="10"');
+  for(let i=0;i<n;i++){ const col=i%4,rw=Math.floor(i/4); s+=rect(56+col*128,266+rw*60,56,54,c.host,'rx="6"'); s+=rect(116+col*128,266+rw*60,56,54,c.tool,'rx="6"'); }
+  s+=txt(310,428,`n = ${n}`,`text-anchor="middle" font-size="28" ${SORA}`);
+  const cx=680,cy=80,cw=670,ch=300;
+  s+=rect(cx,cy,cw,ch,'none',`stroke="${c.line}"`);
+  const xs=[0,1,2,3].map(i=>cx+40+i*((cw-80)/3));
+  const ymax=60; const yf=v=>cy+ch-(v/ymax)*(ch-30);
+  [0,20,40,60].forEach(v=>{ s+=`<line x1="${cx}" y1="${yf(v)}" x2="${cx+cw}" y2="${yf(v)}" stroke="${c.line}"/>`; s+=mut(cx-10,yf(v)+5,v,'text-anchor="end" font-size="14"'); });
+  [1,2,4,8].forEach((v,i)=>s+=mut(xs[i],cy+ch+22,v+(v>1?' agents':' agent'),'text-anchor="middle" font-size="14"'));
+  s+=mut(cx+cw/2,cy-12,'aggregate tok/s across all agents','text-anchor="middle" font-size="14"');
+  const series=[[ [38.9,53.3,51.1,35.2], c.host, 'RTX PRO 6000 + 92 GB, 8 cores · peaks at 2' ],[ [6.7,10.6,15.1,17.4], c.gpu, 'GB10 128 GB, 20 cores · still rising at 8' ]];
+  const prog=seg(t,.1,.75)*3;
+  series.forEach((sr,k)=>{ let d=''; sr[0].forEach((v,i)=>{ if(i>prog)return; const x=xs[i],y=yf(v); d+=(d?'L':'M')+x+','+y; s+=`<circle cx="${x}" cy="${y}" r="6" fill="${sr[1]}"/>`; s+=txt(x,y-14,v.toFixed(1),`text-anchor="middle" font-size="15" fill="${sr[1]}"`); });
+    if(d) s+=`<path d="${d}" fill="none" stroke="${sr[1]}" stroke-width="3"/>`; s+=`<text x="${cx+16}" y="${cy+ch-16-k*24}" fill="${sr[1]}" font-size="15" opacity="${seg(t,.75,.85)}">${sr[2]}</text>`; });
+  return s;
+}};
+
+/* ---------- TENANTS · residency ---------- */
+scenes.residency = {dur:12000, draw(t){
+  const c=C(); let s='';
+  const models=[['Qwen3.8-27B',21],['Qwen3.6-35B-A3B',24],['Qwen3.5-9B',8],['Ling-3.0-flash',74]];
+  const px=2.0, CW=540;
+  function column(x,ttl,cap,evictedIdx,phase){
+    s+=txt(x,40,ttl,`font-size="20" ${SORA}`);
+    const top=60,h=cap*px; s+=rect(x,top,CW,h,c.line,'rx="10"'); s+=mut(x+CW+12,top+16,cap+' GiB','font-size="14"');
+    let y=top+h;
+    models.forEach((m,i)=>{
+      let state='res'; if(i===evictedIdx) state=phase.ling; else if(phase.victim===i) state=phase.victimState;
+      const hh=m[1]*px; if(state==='out') return;
+      const k=state==='loading'?phase.k:1; y-=hh*k;
+      const fill=state==='loading'?c.bad:c.w;
+      s+=rect(x+6,y,CW-12,hh*k-4,fill,'rx="5"'); s+=rect(x+6,y,(CW-12)*.18,hh*k-4,c.kv,'rx="5" opacity=".8"');
+      if(hh*k>18) s+=txt(x+120,y+hh*k/2+6,m[0]+(state==='loading'?' · loading…':''),'font-size="16"');
+      if(phase.task===i&&state==='res') s+=rect(x+6,y,CW-12,hh-4,'none',`stroke="${c.tool}" stroke-width="4" rx="5"`);
+    });
+  }
+  const p=seg(t,.08,.92)*4; const ti=Math.min(3,Math.floor(p)); const frac=p-ti;
+  column(50,'192 GB · all four resident',160,-1,{ling:'res',task:ti});
+  let ph={ling:'out',task:ti,victim:-1,victimState:'res'};
+  if(ti===3){ if(frac<.45) ph={ling:'loading',k:frac/.45,task:-1,victim:1,victimState:'out'}; else ph={ling:'res',task:3,victim:1,victimState:'out'}; }
+  column(760,'128 GB · three resident, Ling evicted',103.6,3,ph);
+  s+=mut(50,410,`task ${ti+1} of 4 · ${models[ti][0]}`,'font-size="16"');
+  if(ti===3&&frac<.45) s+=`<text x="760" y="410" fill="${c.bad}" font-size="16" font-weight="500">evict Qwen3.6-35B → load Ling · 79 s swap</text>`;
+  const ty=432, k=0.9;
+  s+=rect(50,ty,402*k,8,c.ok,'rx="4"'); s+=mut(50+402*k+12,ty+8,'402 s cycle · 0.60 tasks/min','font-size="14"');
+  s+=rect(760,ty,366*k,8,c.ok,'rx="4"'); s+=rect(760+366*k,ty,79*k,8,c.bad,'rx="4"'); s+=mut(760+445*k+12,ty+8,'445 s · 0.54 tasks/min','font-size="14"');
+  return s;
+}};
+
+/* ---------- RECALL · warm contexts ---------- */
+scenes.warm = {dur:12000, draw(t){
+  const c=C(); let s='';
+  s+=title('2× RTX PRO 6000 · Qwen3.8-27B at 65K · 8 GPU slots fixed · only host RAM changes');
+  const n=Math.round(8*Math.pow(2,3*ease(seg(t,.05,.85))));
+  s+=mut(50,80,'GPU · 8 slots · active agents hold a slot, the rest park their context in RAM','font-size="14"');
+  for(let i=0;i<8;i++) s+=rect(50+i*50,88,44,32,c.gpu,'rx="5"');
+  const rows=[['128 GiB RAM',67,16],['256 GiB RAM',137,34]];
+  const px=4, kvW=4*px;
+  rows.forEach((r,ri)=>{
+    const y=170+ri*115;
+    s+=txt(50,y-12,r[0],`font-size="18" ${SORA}`); s+=mut(230,y-12,`cache ${r[1]} GiB → knee ${r[2]} agents`,'font-size="14"');
+    s+=rect(50,y,r[1]*px,40,c.line,'rx="6"');
+    const warm=Math.min(n,r[2]), cold=n-warm;
+    for(let i=0;i<warm;i++) s+=rect(50+i*kvW,y+3,kvW-2,34,c.kv,'rx="3"');
+    for(let i=0;i<cold;i++) s+=rect(50+r[1]*px+10+i*9,y+3,7,34,c.bad,'rx="2"');
+    s+=`<text x="50" y="${y+66}" fill="${cold>0?c.bad:c.ok}" font-size="16">n = ${n} agents · ${warm} warm · ${cold} re-prefill 65K every turn · hit ratio ${(warm/n).toFixed(2)}</text>`;
+  });
+  return s;
+}};
+
+/* ---------- BRIDGE · coherent ---------- */
+scenes.coherent = {dur:9000, draw(t){
+  const c=C(); let s='';
+  s+=title('DGX Station GB300 · HBM 249.5 GiB at 6.1 TB/s · LPDDR 743 GB at 0.39 TB/s · both measured by the probe');
+  const px=1300/743, X=50; const hbmW=249.5*px, hostW=743*px; const yH=95, yL=215, BH=50;
+  s+=mut(X,yH-10,'HBM on the GPU','font-size="14"'); s+=rect(X,yH,hbmW,BH,c.line,'rx="6"');
+  s+=mut(X,yL-10,'host tier · coherent LPDDR','font-size="14"'); s+=rect(X,yL,hostW,BH,c.line,'rx="6"');
+  s+=`<path d="M${X+hbmW/2},${yH+BH} L${X+hbmW/2},${yL}" stroke="${c.muted}" stroke-width="4" stroke-dasharray="8 6"/>`;
+  s+=mut(X+hbmW/2+12,yL-30,'NVLink-C2C','font-size="14"');
+  const res=50*px*ease(seg(t,0,.12)); s+=rect(X+hbmW-res,yH,res,BH,c.muted,'rx="6"');
+  const kv=12*px*ease(seg(t,.12,.3)); s+=rect(X,yH,kv,BH,c.kv,'rx="6"');
+  const total=433, room=249.5-50-12;
+  const w=total*ease(seg(t,.32,.75));
+  const onH=Math.min(w,room); s+=rect(X+kv,yH,onH*px,BH,c.w); if(onH>60) s+=txt(X+kv+10,yH+31,`weights ${onH.toFixed(0)} GiB in HBM`,`font-size="15" fill="${c.panel}"`);
+  const sp=Math.max(0,w-room); if(sp>0){ s+=rect(X,yL,sp*px,BH,c.w,'rx="6"'); s+=txt(X+10,yL+31,`spilled ${sp.toFixed(0)} GiB`,`font-size="15" fill="${c.panel}"`);
+    const tt=(t*8)%1; s+=`<circle cx="${X+hbmW/2}" cy="${yH+BH+(yL-yH-BH)*tt}" r="7" fill="${c.w}"/>`; }
+  if(t>.78){ const f=(total-room)/total; const rel=1/((1-f)+f*6134/388);
+    s+=`<text x="${X}" y="310" fill="${c.ok}" font-size="20" font-weight="500">433 GiB DeepSeek-V4-Pro · ${(f*100).toFixed(0)}% spilled · measured 4.37 tok/s, 168/168 turns</text>`;
+    s+=mut(X,340,`planner estimate from the two bandwidths: ${(rel*100).toFixed(0)}% of in-HBM speed · the GPU waits on the link, not on compute`,'font-size="14"'); }
+  return s;
+}};
+
+/* ---------- FLEET · cluster ---------- */
+scenes.cluster = {dur:10000, draw(t){
+  const c=C(); let s='';
+  s+=title('two Sparks over 200 GbE · nodes and link measured by the cluster probe');
+  const nx=[80,800], ny=70, nw=520, nh=150;
+  nx.forEach((x,i)=>{ s+=rect(x,ny,nw,nh,c.line,'rx="12"'); s+=txt(x+16,ny+30,`node ${i} · GB10 128 GB`,`font-size="17" ${SORA}`); });
+  s+=`<line x1="${nx[0]+nw}" y1="${ny+nh/2}" x2="${nx[1]}" y2="${ny+nh/2}" stroke="${c.muted}" stroke-width="6"/>`;
+  s+=mut(700,ny+nh/2-16,'link','text-anchor="middle" font-size="14"');
+  const phase=t<.5?0:1; const p=phase===0?seg(t,.05,.45):seg(t,.55,.95);
+  if(phase===0){
+    s+=txt(50,270,'single · one whole model per node · nothing crosses the link while serving','font-size="18"');
+    const models=[['Qwen3.8-27B',0],['Ling-3.0-flash',1],['Qwen3.6-35B',0],['Qwen3.5-9B',1]];
+    models.forEach((m,k)=>{ const a=ease(seg(p,k*.22,k*.22+.2)); if(a<=0)return; const x=nx[m[1]]+16+(k>>1)*250, y=ny+50; s+=rect(x,y,236*a,80,c.w,'rx="6"'); if(a>.6) s+=txt(x+12,y+47,m[0],`font-size="16" fill="${c.panel}"`); });
+  } else {
+    s+=txt(50,270,'rpc_split · one model sliced across both nodes · every token crosses the link','font-size="18"');
+    const a=ease(seg(p,0,.35));
+    nx.forEach((x,i)=>{ s+=rect(x+16,ny+50,488*a,80,c.w,'rx="6"'); if(a>.6) s+=txt(x+28,ny+97,`layers ${i===0?'0–23':'24–47'}`,`font-size="16" fill="${c.panel}"`); });
+    if(p>.35){ const tt=(p*6)%1; const dir=Math.floor(p*6)%2; const x0=nx[0]+nw, x1=nx[1]; const x=dir?x1-(x1-x0)*tt:x0+(x1-x0)*tt; s+=`<circle cx="${x}" cy="${ny+nh/2}" r="10" fill="${c.tool}"/>`; }
+    s+=mut(50,305,'force the split on a model one node could hold: the gap to the single-node run is the interconnect cost','font-size="14"');
+  }
+  return s;
+}};
+
+/* ---------- TRACKS · engines ---------- */
+scenes.engines = {dur:9000, draw(t){
+  const c=C(); let s='';
+  s+=title('same model, same replay, same box · the controlled row and the fast row');
+  const rows=[
+    ['GB10 128 GB · Nemotron 3.5 Lightning 30B-A3B · 32K', 'llama.cpp Q4_0', 71.1, 'TensorFold MLX-4bit, drafts on', 169.3],
+    ['M4 16 GB · Qwen3.5-9B 4-bit · 16K', 'llama.cpp Q4_K_M', 17.7, 'MLX 4-bit', 20.0],
+  ];
+  const maxv=180, x0=50, w=1000;
+  rows.forEach((r,i)=>{
+    const y=70+i*125; const a=ease(seg(t,i*.3,i*.3+.35)), b=ease(seg(t,i*.3+.3,i*.3+.7));
+    s+=txt(x0,y+8,r[0],`font-size="16" ${SORA}`);
+    s+=rect(x0,y+20,w*(r[2]/maxv)*a,30,c.w,'rx="6"'); if(a>.9) s+=txt(x0+w*(r[2]/maxv)+12,y+41,`${r[2]} tok/s · ${r[1]}`,'font-size="15"');
+    s+=rect(x0,y+58,w*(r[4]/maxv)*b,30,c.gpu,'rx="6"'); if(b>.9) s+=txt(x0+w*(r[4]/maxv)+12,y+79,`${r[4]} tok/s · ${r[3]}`,'font-size="15"');
+    if(b>.95) s+=mut(x0,y+112,`${(r[4]/r[2]).toFixed(2)}× · both rows use the recorded output policy`,'font-size="14"');
+  });
+  return s;
+}};
+
+/* explain-like-I'm-10 toggles */
+const eliBtns=[...document.querySelectorAll('.eli[aria-controls]')];
+function setEli(btn,open){ const box=document.getElementById(btn.getAttribute('aria-controls')); box.hidden=!open; btn.setAttribute('aria-expanded',String(open)); }
+eliBtns.forEach(b=>b.addEventListener('click',()=>setEli(b,b.getAttribute('aria-expanded')!=='true')));
+const all=document.getElementById('eli-all');
+all.addEventListener('click',()=>{ const open=all.getAttribute('aria-pressed')!=='true'; all.setAttribute('aria-pressed',String(open)); eliBtns.forEach(b=>setEli(b,open)); });
+
+/* ---------- engine ---------- */
+Object.keys(scenes).forEach(id=>{
+  const svg=document.getElementById('svg-'+id), rng=document.getElementById('rng-'+id), sc=scenes[id];
+  let t0=null, manual=false, visible=false, raf=0;
+  function frame(t){ try{ svg.innerHTML=sc.draw(t); }catch(e){ svg.innerHTML=`<text x="20" y="30" fill="red">${e.message}</text>`; } rng.value=Math.round(t*1000); }
+  function tick(now){ if(!visible||manual) return; if(t0===null) t0=now; let t=((now-t0)%(sc.dur+1800))/sc.dur; if(t>1){ t=1; } frame(t); raf=requestAnimationFrame(tick); }
+  function start(){ if(reduced){ frame(1); return; } t0=null; manual=false; cancelAnimationFrame(raf); raf=requestAnimationFrame(tick); }
+  rng.addEventListener('input',()=>{ manual=true; frame(rng.value/1000); });
+  document.querySelector(`[data-replay="${id}"]`).addEventListener('click',()=>{ manual=false; t0=null; visible=true; cancelAnimationFrame(raf); if(reduced){ frame(0); let s=performance.now(); const run=n=>{ const t=Math.min(1,(n-s)/sc.dur); frame(t); if(t<1) requestAnimationFrame(run); }; requestAnimationFrame(run); } else raf=requestAnimationFrame(tick); });
+  frame(reduced?1:0);
+  const io=new IntersectionObserver(es=>{ es.forEach(e=>{ visible=e.isIntersecting; if(visible&&!manual) start(); else cancelAnimationFrame(raf); }); },{threshold:.25});
+  io.observe(svg);
+});
+})();
+</script>

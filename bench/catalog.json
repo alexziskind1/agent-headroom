@@ -1,0 +1,922 @@
+{
+ "catalog_version": "2026.10.6",
+ "_note": "Entries with verified=true were imported from AA-AgentPerf-Local recipes (sizes, SHA-256, KV shape, measured overhead). Others are estimates and produce planner warnings.",
+ "engines": {
+  "llama.cpp": {
+   "overhead_bytes": 1073741824,
+   "backends": [
+    "cuda",
+    "metal",
+    "rocm",
+    "vulkan",
+    "cpu"
+   ],
+   "multi_device": [
+    "pipeline"
+   ],
+   "offload": true,
+   "coherent": true,
+   "cluster": [
+    "rpc"
+   ],
+   "formats": [
+    "gguf"
+   ]
+  },
+  "vllm": {
+   "overhead_bytes": 2147483648,
+   "backends": [
+    "cuda",
+    "rocm"
+   ],
+   "multi_device": [
+    "tensor_parallel",
+    "pipeline"
+   ],
+   "offload": false,
+   "coherent": false,
+   "cluster": [
+    "ray"
+   ],
+   "formats": [
+    "safetensors-fp8",
+    "safetensors-awq",
+    "safetensors-bf16",
+    "nvfp4"
+   ],
+   "docker_image": "vllm/vllm-openai:v0.30.0-ubuntu2404",
+   "_note": "Launched natively if `vllm` is on PATH, else via docker (engines.vllm.docker_image or BENCH_VLLM_IMAGE) with --gpus all --ipc=host --network host and ~/.cache/bench/models mounted at /models. Directory artifacts (safetensors)."
+  },
+  "sglang": {
+   "overhead_bytes": 2147483648,
+   "backends": [
+    "cuda",
+    "rocm"
+   ],
+   "multi_device": [
+    "tensor_parallel"
+   ],
+   "offload": false,
+   "coherent": false,
+   "cluster": [
+    "ray"
+   ],
+   "formats": [
+    "safetensors-fp8",
+    "safetensors-awq",
+    "safetensors-bf16"
+   ]
+  },
+  "mlx": {
+   "overhead_bytes": 536870912,
+   "backends": [
+    "metal"
+   ],
+   "multi_device": [
+    "pipeline"
+   ],
+   "offload": false,
+   "coherent": false,
+   "cluster": [
+    "mlx_distributed"
+   ],
+   "formats": [
+    "mlx-4bit",
+    "mlx-6bit",
+    "mlx-8bit"
+   ],
+   "_note": "mlx_lm.server from BENCH_MLX_PYTHON or ~/.venvs/mlx/bin/python; /health; --decode-concurrency = n_seq. Context is not enforced by the server."
+  },
+  "diffusers": {
+   "overhead_bytes": 1610612736,
+   "backends": [
+    "cuda",
+    "metal",
+    "rocm"
+   ],
+   "multi_device": [],
+   "offload": true,
+   "coherent": false,
+   "cluster": []
+  },
+  "whisper": {
+   "overhead_bytes": 536870912,
+   "backends": [
+    "cuda",
+    "metal",
+    "rocm",
+    "cpu"
+   ],
+   "multi_device": [],
+   "offload": false,
+   "coherent": false,
+   "cluster": []
+  },
+  "tensorfold": {
+   "overhead_bytes": 1073741824,
+   "backends": [
+    "metal",
+    "cuda"
+   ],
+   "multi_device": [
+    "pipeline"
+   ],
+   "offload": false,
+   "coherent": false,
+   "cluster": [
+    "speed_up"
+   ],
+   "formats": [
+    "mlx-4bit",
+    "mlx-6bit",
+    "nvfp4"
+   ],
+   "_note": "tensorfold.dev, Apache-2.0. Binary from BENCH_TENSORFOLD, ~/.tensorfold/bin/tensorfold or PATH. `serve <dir> --name alias --host --port --parallel N --context N`; /health; OpenAI chat with tools and streaming. Qualified on Metal and CUDA (GB10, RTX PRO 6000); Nemotron 3.5 Lightning MLX-4bit and NVFP4 are the cross-engine checkpoints."
+  }
+ },
+ "models": [
+  {
+   "id": "llama-3.1-8b",
+   "modality": "text",
+   "params_total": 8030000000,
+   "params_active": 8030000000,
+   "arch": {
+    "n_layers": 32,
+    "n_kv_heads": 8,
+    "head_dim": 128
+   },
+   "context": {
+    "min": 8192,
+    "max": 131072
+   },
+   "verified": true,
+   "files": [
+    {
+     "quant": "q4_k_m",
+     "bytes": 4920734592,
+     "sha256": null,
+     "url": "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+     "engines": [
+      "llama.cpp"
+     ]
+    },
+    {
+     "quant": "q8_0",
+     "bytes": 8540770304,
+     "sha256": null,
+     "url": "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+     "engines": [
+      "llama.cpp"
+     ]
+    },
+    {
+     "quant": "bf16",
+     "bytes": 16060000000,
+     "sha256": null,
+     "url": "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct",
+     "engines": [
+      "vllm",
+      "sglang"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qwen3.5-9b",
+   "modality": "text",
+   "params_total": 9000000000,
+   "params_active": 9000000000,
+   "arch": {
+    "n_layers": 8,
+    "n_kv_heads": 4,
+    "head_dim": 256,
+    "_note": "full-attention layers only; hybrid/linear layers hold no KV"
+   },
+   "context": {
+    "min": 8192,
+    "max": 131072
+   },
+   "verified": true,
+   "files": [
+    {
+     "quant": "q4_k_m",
+     "bytes": 5868826976,
+     "sha256": "e8dd94817e95d6c0939102049d068418269978377b13616c4726235e232841fe",
+     "filename": "Qwen3.5-9B-Q4_K_M.gguf",
+     "url": "https://huggingface.co/unsloth/Qwen3.5-9B-MTP-GGUF/resolve/9716a636ee4bddc3fed678220b7a33dd2a4160ae/Qwen3.5-9B-Q4_K_M.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "fixed_overhead_bytes": 4151365280,
+     "verified": true,
+     "parts": [
+      {
+       "filename": "Qwen3.5-9B-Q4_K_M.gguf",
+       "bytes": 5868826976,
+       "sha256": "e8dd94817e95d6c0939102049d068418269978377b13616c4726235e232841fe",
+       "url": "https://huggingface.co/unsloth/Qwen3.5-9B-MTP-GGUF/resolve/9716a636ee4bddc3fed678220b7a33dd2a4160ae/Qwen3.5-9B-Q4_K_M.gguf"
+      }
+     ]
+    },
+    {
+     "quant": "mlx-4bit",
+     "kind": "dir",
+     "repo": "mlx-community/Qwen3.5-9B-4bit",
+     "revision": "8b2b98c00a6b4d291155e4890773ca8f769aee53",
+     "bytes": 5950221072,
+     "sha256": null,
+     "url": "https://huggingface.co/mlx-community/Qwen3.5-9B-4bit",
+     "engines": [
+      "mlx",
+      "tensorfold"
+     ]
+    }
+   ],
+   "kv_bytes_per_token": 32768,
+   "aa": {
+    "profile_id": "qwen35-9b-q4-k-m-mtp-rtx5090",
+    "model_release_slug": "qwen3-5-9b",
+    "hf_repository": "unsloth/Qwen3.5-9B-MTP-GGUF",
+    "hf_revision": "9716a636ee4bddc3fed678220b7a33dd2a4160ae",
+    "as_of": "2026-09-21"
+   },
+   "tool_parser": {
+    "vllm": "hermes"
+   }
+  },
+  {
+   "id": "qwen3.8-27b",
+   "modality": "text",
+   "params_total": 27000000000,
+   "params_active": 27000000000,
+   "arch": {
+    "n_layers": 16,
+    "n_kv_heads": 4,
+    "head_dim": 256,
+    "_note": "full-attention layers only; hybrid/linear layers hold no KV"
+   },
+   "context": {
+    "min": 8192,
+    "max": 131072
+   },
+   "verified": true,
+   "files": [
+    {
+     "quant": "q4_k_m",
+     "bytes": 17106775008,
+     "sha256": "7e78da5d7e3ae28d178121f58646953305f3e5bd3cb46f4a75584e8b6c6fe169",
+     "filename": "Qwen3.8-27B-Q4_K_M.gguf",
+     "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/f1bfb127c64f7072bdd2cad55f258b9c8b2910fe/Qwen3.8-27B-Q4_K_M.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "fixed_overhead_bytes": 1790967808,
+     "verified": true,
+     "parts": [
+      {
+       "filename": "Qwen3.8-27B-Q4_K_M.gguf",
+       "bytes": 17106775008,
+       "sha256": "7e78da5d7e3ae28d178121f58646953305f3e5bd3cb46f4a75584e8b6c6fe169",
+       "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/f1bfb127c64f7072bdd2cad55f258b9c8b2910fe/Qwen3.8-27B-Q4_K_M.gguf"
+      }
+     ]
+    },
+    {
+     "quant": "fp8",
+     "bytes": 30866866928,
+     "sha256": null,
+     "url": "https://huggingface.co/Qwen/Qwen3.8-27B-FP8",
+     "engines": [
+      "vllm",
+      "sglang"
+     ],
+     "kind": "dir",
+     "repo": "Qwen/Qwen3.8-27B-FP8",
+     "revision": "017b9c7af6b5689d5dd426a76e0bc077eb5ca20a",
+     "_note": "official Qwen FP8; bytes measured from the pinned revision download (safetensors incl. mtp.safetensors)"
+    },
+    {
+     "quant": "mlx-4bit",
+     "kind": "dir",
+     "repo": "TensorFold/Qwen3.8-27B-MLX-4bit",
+     "revision": null,
+     "bytes": 15500000000,
+     "sha256": null,
+     "url": "https://huggingface.co/TensorFold/Qwen3.8-27B-MLX-4bit",
+     "engines": [
+      "tensorfold",
+      "mlx"
+     ],
+     "_note": "size estimated (27B x 4.5 bit); pin revision before a verified run"
+    }
+   ],
+   "kv_bytes_per_token": 65536,
+   "aa": {
+    "profile_id": "qwen38-27b-q4-k-m",
+    "model_release_slug": "qwen3-8-27b",
+    "hf_repository": "unsloth/Qwen3.8-27B-GGUF",
+    "hf_revision": "f1bfb127c64f7072bdd2cad55f258b9c8b2910fe",
+    "as_of": "2026-09-21"
+   },
+   "tool_parser": {
+    "vllm": "hermes"
+   }
+  },
+  {
+   "id": "qwen3.6-35b-a3b",
+   "modality": "text",
+   "params_total": 35000000000,
+   "params_active": 3000000000,
+   "arch": {
+    "n_layers": 10,
+    "n_kv_heads": 2,
+    "head_dim": 256,
+    "_note": "full-attention layers only; hybrid/linear layers hold no KV"
+   },
+   "context": {
+    "min": 8192,
+    "max": 131072
+   },
+   "verified": true,
+   "files": [
+    {
+     "quant": "q4_k_m",
+     "bytes": 22663387424,
+     "sha256": "0b21525e972670ed59e1812e170b27c26355381f0656ecc4e25617ece7dac58b",
+     "filename": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+     "url": "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF/resolve/5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "fixed_overhead_bytes": 2343053024,
+     "verified": true,
+     "parts": [
+      {
+       "filename": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+       "bytes": 22663387424,
+       "sha256": "0b21525e972670ed59e1812e170b27c26355381f0656ecc4e25617ece7dac58b",
+       "url": "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF/resolve/5bc3e238d916f48a861bac2f8a1990a0e9b7e98d/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+      }
+     ]
+    }
+   ],
+   "kv_bytes_per_token": 20480,
+   "aa": {
+    "profile_id": "qwen36-35b-a3b-q4-k-m-mtp-rtx5090",
+    "model_release_slug": "qwen3-6-35b-a3b",
+    "hf_repository": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+    "hf_revision": "5bc3e238d916f48a861bac2f8a1990a0e9b7e98d",
+    "as_of": "2026-09-21"
+   }
+  },
+  {
+   "id": "nemotron-3.5-lightning-30b-a3b",
+   "modality": "text",
+   "params_total": 30000000000,
+   "params_active": 3000000000,
+   "arch": {
+    "n_layers": 6,
+    "n_kv_heads": 2,
+    "head_dim": 128,
+    "_note": "NemotronH hybrid: 52 blocks, 6 attention (KV), 20 Mamba-2, 26 MoE; KV only on the 6 attention layers. Mamba state is per sequence, not per token."
+   },
+   "state_bytes_per_seq": 100000000,
+   "context": {
+    "min": 8192,
+    "max": 262144
+   },
+   "verified": false,
+   "tool_parser": {
+    "vllm": "hermes"
+   },
+   "_note": "The cross-engine model: one checkpoint family every engine serves at ~4 bits. Sizes from HF listings 2026-10-27.",
+   "files": [
+    {
+     "quant": "q4_0",
+     "kind": "file",
+     "filename": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q4_0.gguf",
+     "bytes": 18898091584,
+     "sha256": "61f87e75974e4b535dcdf9aad056541a9514f1dfa4538b463b081d19b7a00e3c",
+     "url": "https://huggingface.co/ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF/resolve/8cd082170ed313484be1cf44f256a5caa2cfdad3/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q4_0.gguf",
+     "repo": "ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF",
+     "revision": "8cd082170ed313484be1cf44f256a5caa2cfdad3",
+     "engines": [
+      "llama.cpp"
+     ],
+     "verified": true,
+     "_note": "sha256 computed from the pinned ggml-org revision download on a GB10, 2026-10-27"
+    },
+    {
+     "quant": "nvfp4",
+     "kind": "dir",
+     "repo": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4",
+     "revision": "bee7596271d1495f6992ae224aefde4410e816b8",
+     "bytes": 21561882284,
+     "sha256": null,
+     "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4",
+     "engines": [
+      "vllm",
+      "tensorfold"
+     ]
+    },
+    {
+     "quant": "mlx-4bit",
+     "kind": "dir",
+     "repo": "TensorFold/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-MLX-4bit",
+     "revision": "d9d758fb83953437f7263256b0d96157e2a348b8",
+     "bytes": 18527064363,
+     "sha256": null,
+     "url": "https://huggingface.co/TensorFold/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-MLX-4bit",
+     "engines": [
+      "tensorfold",
+      "mlx"
+     ]
+    },
+    {
+     "quant": "fp8",
+     "kind": "dir",
+     "repo": "RedHatAI/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-FP8",
+     "revision": "bff279eb543e15f7c0e3f922661e66a1b78ac2e0",
+     "bytes": 32293788600,
+     "sha256": null,
+     "url": "https://huggingface.co/RedHatAI/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-FP8",
+     "engines": [
+      "vllm",
+      "sglang"
+     ]
+    },
+    {
+     "quant": "bf16",
+     "kind": "dir",
+     "repo": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+     "revision": "a9904d24bcc1d289a1950fa9d2b978c47cf903b9",
+     "bytes": 65827374264,
+     "sha256": null,
+     "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+     "engines": [
+      "vllm",
+      "sglang"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ling-3.0-flash",
+   "modality": "text",
+   "params_total": 124000000000,
+   "params_active": 5000000000,
+   "arch": {
+    "n_layers": 8,
+    "n_kv_heads": 1,
+    "head_dim": 288,
+    "_note": "full-attention layers only; hybrid/linear layers hold no KV"
+   },
+   "context": {
+    "min": 8192,
+    "max": 131072
+   },
+   "verified": true,
+   "files": [
+    {
+     "quant": "q4_k_m",
+     "bytes": 77010144672,
+     "sha256": "24ff06f1ab74546a91f7c07bd725b3015896bbe9dd82ab0e5838be9ed06a6dcf",
+     "filename": "Q4_K_M/Ling-3.0-flash-Q4_K_M-00001-of-00002.gguf",
+     "url": "https://huggingface.co/inclusionAI/Ling-3.0-flash-GGUF/resolve/29edce5130491e638f3e5ebec91fa0a5ed4f780e/Q4_K_M/Ling-3.0-flash-Q4_K_M-00001-of-00002.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "fixed_overhead_bytes": 3747100000,
+     "verified": true,
+     "parts": [
+      {
+       "filename": "Q4_K_M/Ling-3.0-flash-Q4_K_M-00001-of-00002.gguf",
+       "bytes": 49995534208,
+       "sha256": "24ff06f1ab74546a91f7c07bd725b3015896bbe9dd82ab0e5838be9ed06a6dcf",
+       "url": "https://huggingface.co/inclusionAI/Ling-3.0-flash-GGUF/resolve/29edce5130491e638f3e5ebec91fa0a5ed4f780e/Q4_K_M/Ling-3.0-flash-Q4_K_M-00001-of-00002.gguf"
+      },
+      {
+       "filename": "Q4_K_M/Ling-3.0-flash-Q4_K_M-00002-of-00002.gguf",
+       "bytes": 27014610464,
+       "sha256": "1a6a8c91562b817fd8ec5b250453be696b0fc209ed8f2acdb6c13f4e17f7e188",
+       "url": "https://huggingface.co/inclusionAI/Ling-3.0-flash-GGUF/resolve/29edce5130491e638f3e5ebec91fa0a5ed4f780e/Q4_K_M/Ling-3.0-flash-Q4_K_M-00002-of-00002.gguf"
+      }
+     ]
+    }
+   ],
+   "kv_bytes_per_token": 9216,
+   "aa": {
+    "profile_id": "ling3-flash-q4-k-m",
+    "model_release_slug": "ling-3-0-flash",
+    "hf_repository": "inclusionAI/Ling-3.0-flash-GGUF",
+    "hf_revision": "29edce5130491e638f3e5ebec91fa0a5ed4f780e",
+    "as_of": "2026-09-28"
+   }
+  },
+  {
+   "id": "qwen3.5-397b-a17b",
+   "modality": "text",
+   "params_total": 397000000000,
+   "params_active": 17000000000,
+   "arch": {
+    "n_layers": 15,
+    "n_kv_heads": 2,
+    "head_dim": 256,
+    "_note": "full-attention layers only (60 blocks, full_attention_interval=4); the other 45 are Gated DeltaNet"
+   },
+   "state_bytes_per_seq": 194641920,
+   "context": {
+    "min": 8192,
+    "max": 262144
+   },
+   "verified": true,
+   "kv_bytes_per_token": 30720,
+   "_note": "Unsloth Q4_K_M (file_type 15), 6 shards, read off the GGUF header on the DGX Station 2026-10-27. Ladder candidate that barely exceeds a 256 GB HBM pool.",
+   "files": [
+    {
+     "quant": "q4_k_m",
+     "bytes": 244093630912,
+     "sha256": "63c290c9be83e1b4dd41833d81bd933afd535d65657579b9f92f5c3f76e0218d",
+     "filename": "Q4_K_M/Qwen3.5-397B-A17B-Q4_K_M-00001-of-00006.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "fixed_overhead_bytes": 4000000000,
+     "verified": true,
+     "parts": [
+      {
+       "filename": "Qwen3.5-397B-A17B-Q4_K_M-00001-of-00006.gguf",
+       "bytes": 10943552,
+       "sha256": "63c290c9be83e1b4dd41833d81bd933afd535d65657579b9f92f5c3f76e0218d",
+       "url": "https://huggingface.co/unsloth/Qwen3.5-397B-A17B-GGUF/resolve/main/Q4_K_M/Qwen3.5-397B-A17B-Q4_K_M-00001-of-00006.gguf"
+      },
+      {
+       "filename": "Qwen3.5-397B-A17B-Q4_K_M-00002-of-00006.gguf",
+       "bytes": 49136153056,
+       "sha256": "dc94995a3605f3130700e96df51ee56cf93bd9340fe891918403450556453ed7",
+       "url": "https://huggingface.co/unsloth/Qwen3.5-397B-A17B-GGUF/resolve/main/Q4_K_M/Qwen3.5-397B-A17B-Q4_K_M-00002-of-00006.gguf"
+      },
+      {
+       "filename": "Qwen3.5-397B-A17B-Q4_K_M-00003-of-00006.gguf",
+       "bytes": 49735103552,
+       "sha256": "2952dadb60137f413d5f70f6ca3c06007e24198e712c882a094432f58f76c230",
+       "url": "https://huggingface.co/unsloth/Qwen3.5-397B-A17B-GGUF/resolve/main/Q4_K_M/Qwen3.5-397B-A17B-Q4_K_M-00003-of-00006.gguf"
+      },
+      {
+       "filename": "Qwen3.5-397B-A17B-Q4_K_M-00004-of-00006.gguf",
+       "bytes": 49914377024,
+       "sha256": "c7b99959e8fb78c8cfc9b71f3da07a2b4a6d39bf377dfa226f0a7b730c8cf3ba",
+       "url": "https://huggingface.co/unsloth/Qwen3.5-397B-A17B-GGUF/resolve/main/Q4_K_M/Qwen3.5-397B-A17B-Q4_K_M-00004-of-00006.gguf"
+      },
+      {
+       "filename": "Qwen3.5-397B-A17B-Q4_K_M-00005-of-00006.gguf",
+       "bytes": 49654346688,
+       "sha256": "eeea4540f7289ab3baad2b3f2b4b6798e70a1802b9b4b269799a1f04d75b0af0",
+       "url": "https://huggingface.co/unsloth/Qwen3.5-397B-A17B-GGUF/resolve/main/Q4_K_M/Qwen3.5-397B-A17B-Q4_K_M-00005-of-00006.gguf"
+      },
+      {
+       "filename": "Qwen3.5-397B-A17B-Q4_K_M-00006-of-00006.gguf",
+       "bytes": 45642707040,
+       "sha256": "d3bf93bb9fe007910ae9c0fd130d7776d7c6149635c9e7f158312308beb9b754",
+       "url": "https://huggingface.co/unsloth/Qwen3.5-397B-A17B-GGUF/resolve/main/Q4_K_M/Qwen3.5-397B-A17B-Q4_K_M-00006-of-00006.gguf"
+      }
+     ],
+     "url": "https://huggingface.co/unsloth/Qwen3.5-397B-A17B-GGUF/tree/main/Q4_K_M"
+    }
+   ]
+  },
+  {
+   "id": "deepseek-v4-flash",
+   "modality": "text",
+   "params_total": 284000000000,
+   "params_active": 13000000000,
+   "arch": {
+    "n_layers": 43,
+    "n_kv_heads": 1,
+    "head_dim": 576,
+    "kv_single_latent": true
+   },
+   "context": {
+    "min": 8192,
+    "max": 1048576
+   },
+   "verified": false,
+   "_note": "DeepSeek-V4-Flash-0731 (deepseek_v4, MLA: head_dim 512 + rope 64, 43 layers, sliding_window 128 on compressed layers so real KV is below this bound). UD-Q4_K_XL bytes from unsloth/DeepSeek-V4-Flash-0731-GGUF listing (155.07 GB, 5 shards), not hashed.",
+   "files": [
+    {
+     "quant": "ud-q4_k_xl",
+     "bytes": 155095141120,
+     "sha256": null,
+     "url": "https://huggingface.co/unsloth/DeepSeek-V4-Flash-0731-GGUF/tree/main/UD-Q4_K_XL",
+     "engines": [
+      "llama.cpp"
+     ],
+     "split": 5,
+     "shard_bytes": [
+      5257408,
+      48935523072,
+      48980787136,
+      49999168416,
+      7174505088
+     ]
+    },
+    {
+     "quant": "fp8",
+     "bytes": 159617149040,
+     "sha256": null,
+     "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash",
+     "engines": [
+      "vllm",
+      "sglang"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "deepseek-v4-pro",
+   "modality": "text",
+   "params_total": 671000000000,
+   "params_active": 37000000000,
+   "arch": {
+    "n_layers": 61,
+    "n_kv_heads": 1,
+    "head_dim": 576,
+    "kv_single_latent": true
+   },
+   "context": {
+    "min": 8192,
+    "max": 131072
+   },
+   "verified": false,
+   "files": [
+    {
+     "quant": "fp8",
+     "bytes": 690000000000,
+     "sha256": null,
+     "url": null,
+     "engines": [
+      "vllm",
+      "sglang"
+     ]
+    },
+    {
+     "quant": "ud-q4_k_xl",
+     "bytes": 849683927055,
+     "sha256": null,
+     "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/tree/main/UD-Q4_K_XL",
+     "revision": "6d053616d152293da72569f56b861466f10ace7d",
+     "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00001-of-00020.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "verified": false,
+     "parts": [
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00001-of-00020.gguf",
+       "bytes": 5257647,
+       "sha256": "0c6e411bf23282b5f149b3f0d7e0ae37f26bd23c6a3fbe52841437a4016736be",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00001-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00002-of-00020.gguf",
+       "bytes": 48499332992,
+       "sha256": "aeb64ef378a3632ef938a32995b744e4935bcb2a73a6f4d4ac5a1dd8ed6fb467",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00002-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00003-of-00020.gguf",
+       "bytes": 46206696672,
+       "sha256": "440d5d735679f120baac875242c1a353cc37b87ecc41502052609c2bc90e725d",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00003-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00004-of-00020.gguf",
+       "bytes": 46551168480,
+       "sha256": "140fb3dc53d6bd908799044c8e83a71fa72b092c0232648837ab99bfbd60b6a8",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00004-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00005-of-00020.gguf",
+       "bytes": 46211371104,
+       "sha256": "82a295f7d1e5198cf004ac2ed2251a3f1eab76a99f1c17cebae3b5a2020d373e",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00005-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00006-of-00020.gguf",
+       "bytes": 46206696768,
+       "sha256": "f4ae46e760ad3b73ed2f99c8cf1f7e1f45d9013609ac7e8e5d8d040a6dec7f98",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00006-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00007-of-00020.gguf",
+       "bytes": 46551168576,
+       "sha256": "9bd015cbe215ae720f6e4a1708924da10fbc55bff5c9039b044f815abcf9aa77",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00007-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00008-of-00020.gguf",
+       "bytes": 46211371104,
+       "sha256": "f4534f1618f970b21e0585155c6fe3b432be3a54c604edb4bafff8198a161475",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00008-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00009-of-00020.gguf",
+       "bytes": 46206696768,
+       "sha256": "88a0868c24cff08ddb236fd10bba28916604a214d40a9d5c3038bfc61cf3fe21",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00009-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00010-of-00020.gguf",
+       "bytes": 46551168576,
+       "sha256": "ea34c36b38d90fe53d323e76f720ca8de8bd5c9e67ca4490499653b65ffe37fc",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00010-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00011-of-00020.gguf",
+       "bytes": 46211371104,
+       "sha256": "31eea9aebe4dd925cabad9a323813f164bc4728f653fadb7529c3ae350efda0b",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00011-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00012-of-00020.gguf",
+       "bytes": 46206696768,
+       "sha256": "d2cd296b4722733671669b0647d0b034353392fe62cfde819e3fc694cbf683d7",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00012-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00013-of-00020.gguf",
+       "bytes": 46551168576,
+       "sha256": "dd0f7c98b34f1a873ad61c22e0c78f8b85da56b2e2fe6a92016cfc5587bbf317",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00013-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00014-of-00020.gguf",
+       "bytes": 46211371104,
+       "sha256": "9a530b4ceb6231b5fe9a52f9cfd89caece00244089f94125c1081e41be134253",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00014-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00015-of-00020.gguf",
+       "bytes": 46206696768,
+       "sha256": "4983ff25d96c5bc89b111ac6560bef3cdbc6823c19ae3b48a2beef0e0fb90e39",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00015-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00016-of-00020.gguf",
+       "bytes": 46551168576,
+       "sha256": "b466c173037d16dd6e8bdd66cdcd5f0fefa22fa19d73b09a8271340ff8da0274",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00016-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00017-of-00020.gguf",
+       "bytes": 46211371104,
+       "sha256": "a3d408224bae3102de30d66c06efcf4f2ad1d9e6cf7c0f96e8f923e46b581d49",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00017-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00018-of-00020.gguf",
+       "bytes": 46206696768,
+       "sha256": "e8d837147dfc345a56de32f70575d5db708350894dac344a94adc85e4839f291",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00018-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00019-of-00020.gguf",
+       "bytes": 46551168576,
+       "sha256": "bd14f611c85332e42ab737167aefa0034f757b4e5c163fe4134395a585633661",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00019-of-00020.gguf"
+      },
+      {
+       "filename": "UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00020-of-00020.gguf",
+       "bytes": 13575289024,
+       "sha256": "5978999836fd1fe7ad7da6232a70981bd7f98274ed71d3b06652ba42c7b46031",
+       "url": "https://huggingface.co/unsloth/DeepSeek-V4-Pro-0813-GGUF/resolve/6d053616d152293da72569f56b861466f10ace7d/UD-Q4_K_XL/DeepSeek-V4-Pro-0813-UD-Q4_K_XL-00020-of-00020.gguf"
+      }
+     ]
+    },
+    {
+     "quant": "iq2_xxs",
+     "bytes": 464627334560,
+     "sha256": null,
+     "url": null,
+     "filename": "DeepSeek-V4-Pro-IQ2XXS-w2Q2K-AProjQ8-SExpQ8-OutQ8-Instruct-imatrix.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "verified": false,
+     "_note": "IQ2_XXS experts, Q2_K/Q8 mix for attention/shared experts/output; local quant with no pinned HF revision: supply the file with --model-files; sha256 filled after the first run hashes it"
+    }
+   ],
+   "_note": "DeepSeek-V4-Pro-0813 (unsloth GGUF). The earlier 404 GB q4_k_m figure was a guess; the real UD-Q4_K_XL is 791 GiB in 20 shards and does not fit any single box we have. The IQ2_XXS single-file quant (local, not fetched) is the coherent-spill ladder artifact for the DGX Station."
+  },
+  {
+   "id": "qwen2.5-vl-7b",
+   "modality": "vision",
+   "params_total": 8300000000,
+   "params_active": 8300000000,
+   "arch": {
+    "n_layers": 28,
+    "n_kv_heads": 4,
+    "head_dim": 128
+   },
+   "context": {
+    "min": 8192,
+    "max": 32768
+   },
+   "verified": false,
+   "files": [
+    {
+     "quant": "q4_k_m",
+     "bytes": 5100000000,
+     "sha256": null,
+     "url": null,
+     "engines": [
+      "llama.cpp"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "flux.2-klein-4b",
+   "modality": "image_gen",
+   "params_total": 4000000000,
+   "working_set_bytes": 12000000000,
+   "verified": false,
+   "files": [
+    {
+     "quant": "bf16",
+     "bytes": 8000000000,
+     "sha256": null,
+     "url": null,
+     "engines": [
+      "diffusers"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "whisper-large-v3",
+   "modality": "asr",
+   "params_total": 1550000000,
+   "working_set_bytes": 4000000000,
+   "verified": true,
+   "files": [
+    {
+     "quant": "fp16",
+     "bytes": 3090000000,
+     "sha256": null,
+     "url": "https://huggingface.co/openai/whisper-large-v3",
+     "engines": [
+      "whisper"
+     ]
+    }
+   ]
+  }
+ ],
+ "presets": {
+  "residency-workstation": {
+   "description": "Sized to straddle 128 GB and 192 GB unified machines. Pack order is priority order.",
+   "models": [
+    "qwen3.8-27b",
+    "qwen2.5-vl-7b",
+    "flux.2-klein-4b",
+    "whisper-large-v3",
+    "ling-3.0-flash"
+   ],
+   "context": 32768
+  },
+  "residency-text-workstation": {
+   "description": "Text-only residency set for v0 (llama.cpp only). ~123 GB total: straddles 128 GB and 192 GB unified machines. Pack order is priority order.",
+   "models": [
+    "qwen3.8-27b",
+    "qwen3.6-35b-a3b",
+    "qwen3.5-9b",
+    "ling-3.0-flash"
+   ],
+   "context": 32768
+  }
+ },
+ "engine_preference": {
+  "cuda": [
+   "vllm",
+   "sglang",
+   "tensorfold",
+   "llama.cpp"
+  ],
+  "metal": [
+   "tensorfold",
+   "mlx",
+   "llama.cpp"
+  ],
+  "rocm": [
+   "vllm",
+   "sglang",
+   "llama.cpp"
+  ],
+  "vulkan": [
+   "llama.cpp"
+  ],
+  "cpu": [
+   "llama.cpp"
+  ]
+ }
+}
