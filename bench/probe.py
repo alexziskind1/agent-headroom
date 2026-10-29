@@ -410,6 +410,21 @@ def probe_amdgpu_sysfs(warnings: list[str]) -> list[dict]:
     return devices
 
 
+def llama_server_backend() -> str | None:
+    """Backend of the configured llama-server build, from `--list-devices` (ROCm0, Vulkan0, ...).
+    On AMD boxes where Vulkan and ROCm builds coexist, the build that will serve is the ground truth,
+    not whichever smi tool happens to be installed."""
+    bin_ = os.environ.get("BENCH_LLAMA_SERVER", "llama-server")
+    out = _run([bin_, "--list-devices"], timeout=30.0)
+    for line in (out or "").splitlines():
+        s = line.strip()
+        if s.startswith(("ROCm", "HIP")):
+            return "rocm"
+        if s.startswith("Vulkan"):
+            return "vulkan"
+    return None
+
+
 def probe_rocm_devices(warnings: list[str]) -> list[dict]:
     out = _run(["rocm-smi", "--showmeminfo", "vram", "--json"])
     if not out:
@@ -556,6 +571,11 @@ def run_probe(storage_test: bool = True, bandwidth: bool | None = None) -> dict:
         devices = probe_rocm_devices(warnings)
     if not devices:
         devices = probe_amdgpu_sysfs(warnings)
+        served = llama_server_backend() if devices else None
+        if served and served != "vulkan":
+            for d in devices:
+                d["backend"] = served
+            warnings.append(f"AMD GPU backend set to {served} from the configured llama-server build (--list-devices)")
         # An AMD APU carve-out is unified memory: decide by CPU model, since sysfs has no integrated flag.
         cpu = (host["cpu"]["model"] or "").lower()
         sys_total = mem["system_total_bytes"] or 0
