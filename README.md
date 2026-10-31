@@ -32,8 +32,8 @@ python3 -m bench run out/plan-<host>-inference.json --replay aa-mini-v1    # smo
 python3 -m bench run out/plan-<host>-inference.json                         # full 8-task replay
 python3 -m bench run out/plan-<host>-host_pressure.json --levels 1,2,4        # concurrency sweep
 python3 -m bench run out/plan-<host>-residency-text.json                      # multi-model residency
-python3 -m bench run out/plan-<host>-warm_contexts.json --levels 8,16,32,64     # fleet sweep past the modeled knee
-python3 -m bench run out/plan-<host>-warm_contexts.json --replay warm-long-v1 --levels 8,12,16,24   # same knee, 4x shorter levels
+python3 -m bench run out/plan-<host>-warm_contexts.json --levels 8,12,16,24     # fleet sweep past the modeled knee (warm-long-v1)
+python3 -m bench run out/plan-<host>-warm_contexts.json --replay agentperf-default-v1 --levels 8   # full replay, one level
 python3 -m bench remote <host> probe                                           # same commands on another machine
 python3 -m bench cluster probe clusters/sparks.json                             # multi-node: merge node probes, measure links
 python3 -m bench plan inference --probe out/probe-sparks.json --model qwen3.8-27b --placement rpc_split   # force the split
@@ -84,9 +84,8 @@ What 0.1.0 does not do, or does only partly. Each is stated in the result file w
 - **Clusters are llama.cpp RPC only.** Residency on cluster workers launches llama-server over ssh; other engines run only on the head.
 - **Coherent memory is measured on one machine class** (DGX Station GB300) with naive demand-paged spill into LPDDR. Tensor-override placement is not implemented.
 - **Engine rows use AgentPerf's recorded output policy.** Compare a vLLM, MLX or TensorFold row only with a llama.cpp row run with `--output-policy recorded` at the same context; the exact policy works on llama.cpp alone.
-- **The full-replay warm_contexts sweep is impractical.** Level wall time grows with agents times turns times time to first token. Use `--replay warm-long-v1` for the sweep; the full replay is for the smoke.
+- **warm_contexts sweeps use the warm-long-v1 subset by default** (the two long meeting tasks, 41 turns). Level wall time grows with agents times turns times time to first token, so the full replay is opt-in with `--replay agentperf-default-v1` and is meant for one level, not a sweep.
 - **Catalog entries marked `verified: false` are estimates** and produce planner warnings. The DeepSeek-V4-Pro IQ2_XXS quant has no download URL; supply it with `--model-files`.
-- **No one outside the original fleet has installed it yet.** agentperf-local, llama-server on PATH and the gated Llama 3.1 download are the likely first obstacles. Open an issue with the probe and the command.
 - **No CI yet.** Run `python3 -m unittest discover tests` before sending changes; 80 tests, no network needed.
 
 ## License

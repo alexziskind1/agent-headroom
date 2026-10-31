@@ -113,6 +113,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             print(residency_summary(result))
         elif plan["test"] == "warm_contexts":
             from .warm import run_warm, summarize as warm_summary
+            # Level wall grows with agents x turns x TTFT, so the sweep defaults to the two long meeting tasks;
+            # the full replay stays available with --replay agentperf-default-v1.
+            opts["replay"] = args.replay or "warm-long-v1"
             code, result = run_warm(plan, cat, opts)
             print(warm_summary(result))
         elif plan["test"] == "host_pressure":
@@ -240,8 +243,8 @@ def main(argv: list[str] | None = None) -> int:
     pr = sub.add_parser("run", help="execute a plan.json (inference/host_pressure via llama-server + agentperf-local)")
     pr.add_argument("plan")
     pr.add_argument("--catalog", help="catalog path (default bundled)")
-    pr.add_argument("--replay", help="agentperf-default-v1 (default for inference) or aa-mini-v1 (default for host_pressure); "
-                    "warm_contexts also takes warm-long-v1 (the two 44K/56K-token meeting tasks, 41 turns) or a custom manifest path")
+    pr.add_argument("--replay", help="agentperf-default-v1 (default for inference), aa-mini-v1 (default for host_pressure and residency), "
+                    "warm-long-v1 (default for warm_contexts: the two 44K/56K-token meeting tasks, 41 turns) or a custom manifest path")
     pr.add_argument("--tool-mode", choices=["none", "fixed_delay", "live"], help="default: none (inference), fixed_delay (host_pressure)")
     pr.add_argument("--model-files", action="append", metavar="MODEL_ID=PATH", help="residency: per-model file override (repeatable)")
     pr.add_argument("--slots", type=int, help="warm_contexts: override the plan's GPU slot count")
