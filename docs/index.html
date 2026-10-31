@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Agent Headroom</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Agent Headroom: memory-aware benchmarks for agent fleets. Five tests that measure how many coding agents a machine can run before it clips.">
+<meta property="og:title" content="Agent Headroom">
+<meta property="og:description" content="Memory-aware benchmarks for agent fleets. Probe, plan, run, report.">
+<meta property="og:url" content="https://agentheadroom.com/">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='2' y='2' width='60' height='60' rx='14' fill='%23111820' stroke='%23223040' stroke-width='2'/%3E%3Cline x1='12' y1='14' x2='52' y2='14' stroke='%23e8eef4' stroke-width='2' stroke-dasharray='4 3' stroke-linecap='round'/%3E%3Crect x='14' y='40' width='9' height='12' rx='2' fill='%2339c6f2'/%3E%3Crect x='27.5' y='30' width='9' height='22' rx='2' fill='%2339c6f2'/%3E%3Crect x='41' y='22' width='9' height='30' rx='2' fill='%2339c6f2'/%3E%3Crect x='41' y='15' width='9' height='6' rx='1.5' fill='%23f6a84b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+html{color-scheme:dark}
+img{max-width:100%}
+[hidden]{display:none!important}
+/* Layout: one dark instrument panel. A wide hero with the live headroom meter, then full-bleed bands:
+   five test cards on a grid, a measured-results strip with scaled charts, the four-step CLI, badges, footer. */
+:root {
+  --bg: #0a0e13; --panel: #111820; --panel-2: #161f29; --line: #223040; --line-2: #2d3d4f;
+  --fg: #e8eef4; --muted: #93a1b0; --faint: #5d6b7a;
+  --gpu: #39c6f2; --host: #f6a84b; --ctx: #b58cff; --weights: #3f86ff; --ok: #4fd98a; --bad: #ff5e6c;
+  --glow: rgba(246,168,75,.18);
+  --display: "Sora", "Inter", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f3f5f8; --panel: #ffffff; --panel-2: #eaeef3; --line: #d5dce5; --line-2: #c2ccd8;
+    --fg: #101820; --muted: #4f5d6c; --faint: #8a97a5;
+    --gpu: #0f93c0; --host: #c97a17; --ctx: #7a52d6; --weights: #2a68d8; --ok: #1f9d5c; --bad: #d8384a;
+    --glow: rgba(201,122,23,.14);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f3f5f8; --panel: #ffffff; --panel-2: #eaeef3; --line: #d5dce5; --line-2: #c2ccd8;
+  --fg: #101820; --muted: #4f5d6c; --faint: #8a97a5;
+  --gpu: #0f93c0; --host: #c97a17; --ctx: #7a52d6; --weights: #2a68d8; --ok: #1f9d5c; --bad: #d8384a;
+  --glow: rgba(201,122,23,.14);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 17px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--host); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.02em; }
+p { margin: 0; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.kicker { font-family: var(--mono); font-size: 12.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.kicker b { color: var(--ok); font-weight: 500; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* nav */
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 18px; }
+.lockup { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.lockup svg { width: 36px; height: 36px; flex: none; }
+.lockup .name { font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: .02em; }
+.lockup .name span { font-family: var(--mono); font-weight: 500; color: var(--ok); letter-spacing: .18em; font-size: 11.5px; display: block; line-height: 1; margin-bottom: 3px; }
+.nav-links { display: flex; gap: 22px; font-size: 14.5px; color: var(--muted); }
+.nav-links a { text-decoration: none; }
+.nav-links a:hover { color: var(--fg); }
+@media (max-width: 640px) { .nav-links { display: none; } }
+
+/* hero */
+.hero { padding-block: 40px 56px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 40px; align-items: center; }
+@media (max-width: 900px) { .hero { grid-template-columns: 1fr; gap: 28px; padding-block: 24px 40px; } }
+.hero h1 { font-size: clamp(38px, 5.6vw, 66px); line-height: 1.02; font-weight: 800; }
+.hero h1 em { font-style: normal; color: var(--host); }
+.hero .lede { margin-top: 20px; font-size: 19px; color: var(--muted); max-width: 34ch; }
+.hero .lede strong { color: var(--fg); font-weight: 500; }
+.cta { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px; }
+.btn { font-family: var(--display); font-weight: 600; font-size: 15px; padding: 12px 20px; border-radius: 10px; text-decoration: none; border: 1px solid var(--line-2); background: var(--panel); transition: transform .15s ease, border-color .15s ease; }
+.btn:hover { transform: translateY(-1px); border-color: var(--host); }
+.btn.primary { background: var(--host); color: #0a0e13; border-color: var(--host); }
+.btn.primary:hover { filter: brightness(1.08); }
+.hero-meta { margin-top: 22px; display: flex; gap: 18px; flex-wrap: wrap; font-family: var(--mono); font-size: 13px; color: var(--faint); }
+.hero-meta span b { color: var(--muted); font-weight: 500; }
+
+.meter { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 40px 80px -40px var(--glow); min-width: 0; }
+.meter::before { content: ""; position: absolute; inset: -1px; border-radius: 18px; background: radial-gradient(120% 80% at 80% -10%, var(--glow), transparent 60%); pointer-events: none; }
+.meter-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.meter-head .title { font-family: var(--mono); font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.meter-head .title i { font-style: normal; color: var(--ok); }
+.meter-read { font-family: var(--display); font-weight: 700; font-size: 15px; }
+.meter-read .n { color: var(--host); font-size: 22px; }
+.meter canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; max-width: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; background: var(--c); }
+
+/* bands */
+.band { padding-block: 72px; border-top: 1px solid var(--line); }
+.band.alt { background: var(--panel); }
+@media (max-width: 640px) { .band { padding-block: 48px; } }
+.band-head { max-width: 62ch; margin-bottom: 36px; }
+.band-head h2 { font-size: clamp(28px, 3.6vw, 40px); font-weight: 700; margin-top: 10px; }
+.band-head p { margin-top: 14px; color: var(--muted); font-size: 17.5px; }
+
+/* test cards */
+.tests { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+.test { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 20px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; position: relative; overflow: hidden; transition: border-color .2s ease, transform .2s ease; }
+.band.alt .test { background: var(--panel-2); }
+.test:hover { border-color: var(--line-2); transform: translateY(-2px); }
+.test .glyph { width: 64px; height: 64px; color: var(--fg); }
+.test .glyph svg { width: 100%; height: 100%; }
+.test h3 { font-size: 24px; font-weight: 800; letter-spacing: .01em; }
+.test h3 small { display: block; font-family: var(--mono); font-weight: 400; font-size: 12px; letter-spacing: .1em; color: var(--faint); margin-top: 4px; }
+.test .k { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--host); }
+.test p { color: var(--muted); font-size: 15px; line-height: 1.5; }
+.test .answer { margin-top: auto; padding-top: 12px; border-top: 1px dashed var(--line-2); font-size: 14px; color: var(--fg); }
+.test .answer b { font-family: var(--mono); font-weight: 500; color: var(--gpu); }
+
+/* results */
+.results { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.chart { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.band.alt .chart { background: var(--panel-2); }
+.chart h3 { font-size: 18px; font-weight: 700; }
+.chart .sub { color: var(--muted); font-size: 14px; }
+.chart svg { width: 100%; height: auto; max-width: 100%; display: block; font-family: var(--mono); }
+.chart .foot { font-family: var(--mono); font-size: 12px; color: var(--faint); margin-top: auto; }
+.bar-label { fill: var(--fg); font-size: 12.5px; }
+.bar-val { fill: var(--muted); font-size: 12px; }
+.axis { stroke: var(--line-2); stroke-width: 1; }
+.grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; }
+
+/* flow */
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; counter-reset: step; }
+.step { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; min-width: 0; }
+.step .cmd { font-family: var(--mono); font-size: 13.5px; color: var(--ok); margin-bottom: 8px; display: block; }
+.step .cmd::before { counter-increment: step; content: counter(step) "  "; color: var(--faint); }
+.step h3 { font-size: 17px; font-weight: 700; }
+.step p { color: var(--muted); font-size: 14.5px; margin-top: 6px; }
+pre { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 24px 0 0; overflow-x: auto; font-family: var(--mono); font-size: 13.5px; line-height: 1.65; color: var(--fg); }
+pre .c { color: var(--faint); }
+pre .g { color: var(--ok); }
+
+/* badges */
+.badges { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.badge { display: flex; gap: 14px; align-items: flex-start; background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px; padding: 18px; min-width: 0; }
+.badge .glyph { width: 44px; height: 44px; flex: none; color: var(--fg); }
+.badge .glyph svg { width: 100%; height: 100%; }
+.badge h3 { font-size: 18px; font-weight: 800; }
+.badge p { color: var(--muted); font-size: 14.5px; margin-top: 4px; }
+
+/* principles */
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px 32px; }
+.principle h3 { font-size: 17px; font-weight: 700; }
+.principle p { color: var(--muted); font-size: 15px; margin-top: 6px; }
+.principle .rule { width: 36px; height: 3px; border-radius: 2px; background: var(--host); margin-bottom: 12px; }
+
+/* footer */
+footer { padding-block: 40px 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+footer .row { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: center; }
+footer a { color: var(--muted); }
+footer a:hover { color: var(--fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .test { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <nav class="nav" aria-label="Primary">
+    <a class="lockup" href="#top" aria-label="Agent Headroom">
+      <svg viewBox="0 0 64 64" role="img" aria-hidden="true"><rect x="2" y="2" width="60" height="60" rx="14" fill="#111820" stroke="#223040" stroke-width="2"/><line x1="12" y1="14" x2="52" y2="14" stroke="#e8eef4" stroke-width="2" stroke-dasharray="4 3" stroke-linecap="round"/><rect x="14" y="40" width="9" height="12" rx="2" fill="#39c6f2"/><rect x="27.5" y="30" width="9" height="22" rx="2" fill="#39c6f2"/><rect x="41" y="22" width="9" height="30" rx="2" fill="#39c6f2"/><rect x="41" y="15" width="9" height="6" rx="1.5" fill="#f6a84b"/></svg>
+      <span class="name"><span>AGENT</span>HEADROOM</span>
+    </a>
+    <div class="nav-links">
+      <a href="#tests">Tests</a>
+      <a href="#results">Results</a>
+      <a href="#how">How it runs</a>
+      <a href="https://github.com/alexziskind1/agent-headroom">GitHub</a>
+    </div>
+  </nav>
+</header>
+
+<main id="top">
+<section class="wrap hero">
+  <div>
+    <p class="kicker"><b>memory-aware benchmarks</b> for agent fleets</p>
+    <h1 style="margin-top:14px">How many agents can your box run before it <em>clips</em>?</h1>
+    <p class="lede">Headroom is the margin before clipping. Agent Headroom replays <strong>real coding-agent sessions</strong> against your own hardware and measures five kinds of margin: size, speed, concurrency, models, and context.</p>
+    <div class="cta">
+      <a class="btn primary" href="#how">Run it on your machine</a>
+      <a class="btn" href="#results">See measured results</a>
+    </div>
+    <div class="hero-meta">
+      <span><b>8 tasks</b> · 168 turns · 2.5M prompt tokens</span>
+      <span><b>CUDA</b> · Metal · ROCm · Vulkan</span>
+      <span><b>Apache-2.0</b></span>
+    </div>
+  </div>
+  <div class="meter" aria-label="Live headroom meter: memory used as agents are added, against the machine's ceiling">
+    <div class="meter-head">
+      <span class="title">headroom meter <i>· 128 GB unified · planner estimate</i></span>
+      <span class="meter-read num" id="meterRead"><span class="n">12</span> agents fit · clips at 16</span>
+    </div>
+    <canvas id="meter" width="960" height="600"></canvas>
+    <div class="legend">
+      <span style="--c: var(--weights)">weights</span>
+      <span style="--c: var(--ctx)">KV cache</span>
+      <span style="--c: var(--gpu)">warm contexts</span>
+      <span style="--c: var(--host)">headroom</span>
+      <span style="--c: var(--bad)">clipped</span>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="tests">
+  <div class="wrap">
+    <div class="band-head">
+      <p class="kicker">five tests · five margins</p>
+      <h2>Each test answers one question with one number you can act on.</h2>
+      <p>The workload is frozen: the same recorded agent sessions, replayed turn by turn with the same tool calls. Only the machine changes.</p>
+    </div>
+    <div class="tests">
+      <article class="test">
+        <div class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18M17 3v18"/><path d="M7 7h10M7 17h10"/><path d="M7 12h10" stroke="#f6a84b" stroke-width="2.4"/><rect x="9.5" y="8.5" width="5" height="3" rx="0.8" fill="#3f86ff" stroke="none"/></svg></div>
+        <span class="k">size headroom</span>
+        <h3>RUNG <small>ladder</small></h3>
+        <p>Climbs the model catalog and the context length until the box is full. The answer is categorical before it is numerical: which model, at what context.</p>
+        <div class="answer">GB10 128 GB → <b>Ling-3.0-flash at 131K</b></div>
+      </article>
+      <article class="test">
+        <div class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="3"/><path d="M5 12h3l2-4 3 8 2-4h4" stroke="#39c6f2" stroke-width="2.2"/></svg></div>
+        <span class="k">speed headroom</span>
+        <h3>PACE <small>inference</small></h3>
+        <p>One agent, the full 168-turn replay at 65K context. Decode speed, end-to-end speed, and the wall clock a real session would take.</p>
+        <div class="answer">DGX Station → <b>88.8 tok/s, 8.1 min</b></div>
+      </article>
+      <article class="test">
+        <div class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 3v18" stroke-width="2"/><circle cx="5" cy="6" r="2" fill="#4fd98a" stroke="none"/><circle cx="11" cy="6" r="2" fill="#4fd98a" stroke="none"/><circle cx="5" cy="12" r="2" fill="#4fd98a" stroke="none"/><circle cx="11" cy="12" r="2" fill="#4fd98a" stroke="none"/><circle cx="16.5" cy="12" r="2" fill="#4fd98a" stroke="none"/><circle cx="5" cy="18" r="2" fill="#4fd98a" stroke="none"/><circle cx="11" cy="18" r="2" fill="#4fd98a" stroke="none"/><circle cx="16.5" cy="18" r="2" fill="#ff5e6c" stroke="none"/></svg></div>
+        <span class="k">concurrency headroom</span>
+        <h3>CROWD <small>host_pressure</small></h3>
+        <p>Adds agents with live tools until the first turn fails. Host RAM and CPU are sampled the whole time, so you see what actually ran out.</p>
+        <div class="answer">Ryzen 192 GB → <b>2 agents</b>, host pool full at 4</div>
+      </article>
+      <article class="test">
+        <div class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="#3f86ff" stroke="none"/><rect x="13" y="3" width="8" height="8" rx="1.5" fill="#3f86ff" stroke="none"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="#3f86ff" stroke="none"/><rect x="13" y="13" width="8" height="8" rx="1.5" stroke="#ff5e6c" stroke-dasharray="2.5 2"/><path d="M15.5 19.5l3-3M18.5 19.5l-3-3" stroke="#ff5e6c"/></svg></div>
+        <span class="k">model headroom</span>
+        <h3>TENANTS <small>residency</small></h3>
+        <p>Keeps a set of models loaded at once and cycles work through them. Counts what stays resident and prices every swap in seconds.</p>
+        <div class="answer">GB10 → <b>3 resident, 79 s swap</b></div>
+      </article>
+      <article class="test">
+        <div class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7" height="5" rx="1.2" fill="#39c6f2" stroke="none"/><rect x="3" y="12" width="18" height="3" rx="1" fill="#b58cff" stroke="none"/><rect x="3" y="17" width="18" height="3" rx="1" fill="#b58cff" stroke="none"/><path d="M16 11V5M13.5 7.5L16 5l2.5 2.5" stroke="#f6a84b" stroke-width="2"/></svg></div>
+        <span class="k">context headroom</span>
+        <h3>RECALL <small>warm_contexts</small></h3>
+        <p>Parks each agent's context in host RAM between turns. How many agents stay warm before restores turn back into re-prefills?</p>
+        <div class="answer">128 GB RAM → <b>12 warm</b>, collapse at 16</div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="band alt" id="results">
+  <div class="wrap">
+    <div class="band-head">
+      <p class="kicker">measured, not modeled</p>
+      <h2>Same replay, same flags, five very different machines.</h2>
+      <p>Every number below comes from a result file with the probe, the plan, the server command line, and a memory trace beside it.</p>
+    </div>
+    <div class="results">
+      <div class="chart">
+        <h3>Agents sustained with live tools</h3>
+        <p class="sub">CROWD, Qwen3.8-27B at 65K. The first level where a turn drops ends the run.</p>
+        <svg viewBox="0 0 520 190" role="img" aria-label="Bar chart: agents sustained. DGX Station 16, GB10 8, RTX PRO 6000 8, Ryzen 192 GB 2.">
+          <line class="axis" x1="150" y1="8" x2="150" y2="170"/>
+          <g class="grid"><line x1="150" y1="170" x2="500" y2="170"/></g>
+          <text class="bar-label" x="142" y="34" text-anchor="end">DGX Station GB300</text>
+          <rect x="150" y="20" width="350" height="20" rx="3" fill="var(--ok)"/>
+          <text class="bar-val" x="494" y="34" text-anchor="end" fill="#0a0e13">16</text>
+          <text class="bar-label" x="142" y="70" text-anchor="end">GB10 128 GB</text>
+          <rect x="150" y="56" width="175" height="20" rx="3" fill="var(--ok)"/>
+          <text class="bar-val" x="333" y="70">8 · still rising</text>
+          <text class="bar-label" x="142" y="106" text-anchor="end">RTX PRO 6000 96 GB</text>
+          <rect x="150" y="92" width="175" height="20" rx="3" fill="var(--ok)"/>
+          <text class="bar-val" x="333" y="106">8 · peaks at 2</text>
+          <text class="bar-label" x="142" y="142" text-anchor="end">Ryzen AI Max+ 192 GB</text>
+          <rect x="150" y="128" width="44" height="20" rx="3" fill="var(--bad)"/>
+          <text class="bar-val" x="202" y="142">2 · 32 GB host pool</text>
+          <text class="bar-val" x="150" y="186">0</text>
+          <text class="bar-val" x="325" y="186" text-anchor="middle">8</text>
+          <text class="bar-val" x="500" y="186" text-anchor="end">16 agents</text>
+        </svg>
+        <p class="foot">The Ryzen box decodes as fast as the GB10 with one agent. Only the memory tests see the difference.</p>
+      </div>
+      <div class="chart">
+        <h3>The fastest engine on the box</h3>
+        <p class="sub">TRACKS, Nemotron 3.5 Lightning 30B-A3B on a GB10, 32K context, decode tok/s.</p>
+        <svg viewBox="0 0 520 190" role="img" aria-label="Bar chart: decode tokens per second on a GB10. llama.cpp 71.1, vLLM 109, TensorFold 169.3.">
+          <line class="axis" x1="120" y1="8" x2="120" y2="150"/>
+          <g class="grid"><line x1="120" y1="150" x2="500" y2="150"/></g>
+          <text class="bar-label" x="112" y="38" text-anchor="end">llama.cpp Q4_0</text>
+          <rect x="120" y="24" width="160" height="22" rx="3" fill="var(--muted)"/>
+          <text class="bar-val" x="288" y="39">71.1</text>
+          <text class="bar-label" x="112" y="82" text-anchor="end">vLLM NVFP4</text>
+          <rect x="120" y="68" width="245" height="22" rx="3" fill="var(--weights)"/>
+          <text class="bar-val" x="373" y="83">109</text>
+          <text class="bar-label" x="112" y="126" text-anchor="end">TensorFold MLX-4bit</text>
+          <rect x="120" y="112" width="380" height="22" rx="3" fill="var(--gpu)"/>
+          <text class="bar-val" x="494" y="127" text-anchor="end" fill="#0a0e13">169.3</text>
+          <text class="bar-val" x="120" y="168">0</text>
+          <text class="bar-val" x="345" y="168" text-anchor="middle">100</text>
+          <text class="bar-val" x="500" y="168" text-anchor="end">170 tok/s</text>
+        </svg>
+        <p class="foot">llama.cpp runs everywhere as the baseline row. The second row is what people really run on that platform.</p>
+      </div>
+      <div class="chart">
+        <h3>Size headroom by machine</h3>
+        <p class="sub">RUNG. Budget for weights plus KV in GiB, and the top rung each box reached.</p>
+        <svg viewBox="0 0 520 230" role="img" aria-label="Bar chart: memory budget in GiB with the model each machine fits. M4 16 GB: 10.9, 9B at 61K. RTX PRO 6000: 86.4. GB10: 103.6, Ling at 131K. Ryzen 192 GB: 144, Ling at 131K. DGX Station: 993, DeepSeek-V4-Pro at 131K.">
+          <line class="axis" x1="130" y1="8" x2="130" y2="210"/>
+          <text class="bar-label" x="122" y="30" text-anchor="end">M4 16 GB</text>
+          <rect x="130" y="16" width="4" height="20" rx="2" fill="var(--ctx)"/>
+          <text class="bar-val" x="142" y="30">10.9 · Qwen3.5-9B at 61K</text>
+          <text class="bar-label" x="122" y="70" text-anchor="end">RTX PRO 6000</text>
+          <rect x="130" y="56" width="32" height="20" rx="2" fill="var(--ctx)"/>
+          <text class="bar-val" x="170" y="70">86.4 · Ling fits, not run</text>
+          <text class="bar-label" x="122" y="110" text-anchor="end">GB10 128 GB</text>
+          <rect x="130" y="96" width="38" height="20" rx="2" fill="var(--ctx)"/>
+          <text class="bar-val" x="176" y="110">103.6 · Ling-3.0-flash at 131K</text>
+          <text class="bar-label" x="122" y="150" text-anchor="end">Ryzen 192 GB</text>
+          <rect x="130" y="136" width="53" height="20" rx="2" fill="var(--ctx)"/>
+          <text class="bar-val" x="191" y="150">144 · Ling-3.0-flash at 131K</text>
+          <text class="bar-label" x="122" y="190" text-anchor="end">DGX Station</text>
+          <rect x="130" y="176" width="370" height="20" rx="2" fill="var(--host)"/>
+          <text class="bar-val" x="494" y="190" text-anchor="end" fill="#0a0e13">993 · DeepSeek-V4-Pro, 433 GiB, 57% in host RAM</text>
+          <text class="bar-val" x="130" y="224">0</text>
+          <text class="bar-val" x="500" y="224" text-anchor="end">1000 GiB</text>
+        </svg>
+        <p class="foot">The Station's bar is HBM plus LPDDR over NVLink-C2C: the BRIDGE badge. Scale is linear.</p>
+      </div>
+      <div class="chart">
+        <h3>What a swap costs</h3>
+        <p class="sub">TENANTS, four-model text preset. Residents stay loaded; Ling-3.0-flash is evicted and restored.</p>
+        <svg viewBox="0 0 520 190" role="img" aria-label="Bar chart: swap seconds. Ryzen 192 GB 0 seconds, all four resident. GB10 128 GB 79 seconds. Two RTX PRO 6000 with 128 GB RAM, one GPU used: 11.2 seconds.">
+          <line class="axis" x1="150" y1="8" x2="150" y2="150"/>
+          <text class="bar-label" x="142" y="38" text-anchor="end">Ryzen 192 GB</text>
+          <rect x="150" y="24" width="3" height="22" rx="1" fill="var(--ok)"/>
+          <text class="bar-val" x="161" y="39">0 s · all 4 resident</text>
+          <text class="bar-label" x="142" y="82" text-anchor="end">RTX PRO 6000 + 128 GB</text>
+          <rect x="150" y="68" width="50" height="22" rx="3" fill="var(--host)"/>
+          <text class="bar-val" x="208" y="83">11.2 s · 3 evicted, restore from page cache</text>
+          <text class="bar-label" x="142" y="126" text-anchor="end">GB10 128 GB</text>
+          <rect x="150" y="112" width="346" height="22" rx="3" fill="var(--bad)"/>
+          <text class="bar-val" x="494" y="127" text-anchor="end" fill="#0a0e13">79 s · 3 resident, 1 swap</text>
+          <text class="bar-val" x="150" y="168">0</text>
+          <text class="bar-val" x="500" y="168" text-anchor="end">80 s</text>
+        </svg>
+        <p class="foot">Restores are timed against how much of the file is still in page cache, so RAM size shows up here too.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="how">
+  <div class="wrap">
+    <div class="band-head">
+      <p class="kicker">one session drives the fleet</p>
+      <h2>Probe, plan, run, report. Nothing to install on the targets beyond Python and a server.</h2>
+      <p>The probe reads memory from the driver, never from comparing sizes. The planner only schedules what fits. The runner refuses anything the box changed since the plan.</p>
+    </div>
+    <div class="flow">
+      <div class="step"><span class="cmd">bench probe</span><h3>Read the machine</h3><p>Topology, device and host memory, bandwidth, storage. Unified, discrete, coherent, or a cluster of nodes.</p></div>
+      <div class="step"><span class="cmd">bench plan</span><h3>Size the test</h3><p>Picks the model, quant, context and placement from the catalog that fit this box, and says why anything was rejected.</p></div>
+      <div class="step"><span class="cmd">bench run</span><h3>Replay the agents</h3><p>Launches the server with pinned flags, replays the recorded sessions, samples memory the whole time.</p></div>
+      <div class="step"><span class="cmd">bench report</span><h3>Fold the fleet</h3><p>One table per test across every machine, including runs fetched back from remote hosts and clusters.</p></div>
+    </div>
+<pre><span class="c"># on the box you are sitting at</span>
+python3 -m bench probe
+python3 -m bench plan inference --model qwen3.8-27b --context 65536
+python3 -m bench run out/plan-&lt;host&gt;-inference.json --replay agentperf-default-v1
+
+<span class="c"># the same test on another machine in the fleet, results come back to out/remote/</span>
+python3 -m bench remote &lt;host&gt; probe
+python3 -m bench remote &lt;host&gt; run out/plan-&lt;host&gt;-host_pressure.json --levels 1,2,4,8,16
+
+<span class="c"># fold everything into one report</span>
+python3 -m bench report   <span class="g"># markdown tables per test</span></pre>
+  </div>
+</section>
+
+<section class="band alt">
+  <div class="wrap">
+    <div class="band-head">
+      <p class="kicker">badges</p>
+      <h2>Three things most benchmarks skip.</h2>
+    </div>
+    <div class="badges">
+      <div class="badge">
+        <div class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="8" width="6" height="8" rx="1.5" fill="#39c6f2" stroke="none"/><rect x="13" y="5" width="8.5" height="14" rx="1.5" fill="#f6a84b" stroke="none"/><path d="M8.5 11h4.5M8.5 13h4.5"/></svg></div>
+        <div><h3>BRIDGE</h3><p>Coherent memory. On a DGX Station the GPU reads weights out of LPDDR over NVLink-C2C; the ladder measures how much of a 433 GiB model can live there and what it costs.</p></div>
+      </div>
+      <div class="badge">
+        <div class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5L5.5 17.5h13z"/><circle cx="12" cy="6" r="2.4" fill="#4fd98a" stroke="none"/><circle cx="5.5" cy="17.5" r="2.4" fill="#4fd98a" stroke="none"/><circle cx="18.5" cy="17.5" r="2.4" fill="#4fd98a" stroke="none"/></svg></div>
+        <div><h3>FLEET</h3><p>Clusters. Several machines become one probe, one plan and one run, with the link between them measured, and a model split across nodes when none holds it alone.</p></div>
+      </div>
+      <div class="badge">
+        <div class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18" stroke-width="2.4"/><path d="M3 15h18" stroke="#39c6f2" stroke-width="2.4"/><path d="M7 6.5v5M12 6.5v5M17 6.5v5M7 12.5v5M12 12.5v5M17 12.5v5" stroke="#93a1b0" stroke-width="1"/></svg></div>
+        <div><h3>TRACKS</h3><p>Engine rows. llama.cpp on every machine for a fair comparison, plus vLLM, MLX or TensorFold where they are the fastest thing people actually run.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="band-head">
+      <p class="kicker">rules of the suite</p>
+      <h2>Honest by construction.</h2>
+    </div>
+    <div class="principles">
+      <div class="principle"><div class="rule"></div><h3>Frozen workload</h3><p>Recorded sessions from AgentPerf, replayed exactly. The same 2.5 million prompt tokens on every box, with the never-cacheable share fixed.</p></div>
+      <div class="principle"><div class="rule"></div><h3>Memory from the driver</h3><p>Topology comes from CUDA attributes, Metal, or sysfs, never from guessing by size. A 96 GB card next to 92 GB of RAM is still discrete.</p></div>
+      <div class="principle"><div class="rule"></div><h3>Pinned artifacts</h3><p>Every model file has a byte count and a SHA-256 in the catalog. A run on the wrong file says so in the result.</p></div>
+      <div class="principle"><div class="rule"></div><h3>Failures are results</h3><p>A dropped turn, an eviction that did not round-trip, a server that would not load: all recorded with the memory trace, not retried away.</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap row">
+    <span>Agent Headroom · Apache-2.0 · built on <a href="https://github.com/ArtificialAnalysis/aa-agentperf-local">AgentPerf</a> by Artificial Analysis and <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a></span>
+    <a href="https://github.com/alexziskind1/agent-headroom">github.com/alexziskind1/agent-headroom</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var cv = document.getElementById('meter');
+  var read = document.getElementById('meterRead');
+  if (!cv || !cv.getContext) return;
+  var ctx = cv.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  // A 128 GB unified box serving a 27B at 65K: weights fixed, KV and warm contexts grow per agent.
+  var levels = [1, 2, 4, 8, 12, 16];
+  var ceiling = 103.6;              // GiB budget the planner gives the GPU
+  var weights = 15.9;               // Q4_K_M weights
+  var kvPer = 4.0;                  // 65K context at 64 KiB/token
+  var ctxPer = 2.1;                 // one parked context in host RAM plus client
+  var engine = 1.0;
+  var W = 960, H = 600, pad = { l: 70, r: 28, t: 56, b: 58 };
+  var start = null, DUR = 1500;
+
+  function draw(t) {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cw = cv.clientWidth || 960, ch = cw * 10 / 16;
+    if (cv.width !== Math.round(cw * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+    ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    var fg = css('--fg'), muted = css('--muted'), faint = css('--faint'), line = css('--line-2');
+    var cW = css('--weights'), cK = css('--ctx'), cC = css('--gpu'), cH = css('--host'), cB = css('--bad');
+    var plotH = H - pad.t - pad.b, plotW = W - pad.l - pad.r;
+    var maxGiB = 150;
+    var y = function (g) { return pad.t + plotH - (g / maxGiB) * plotH; };
+
+    // grid
+    ctx.font = '12px IBM Plex Mono, Menlo, monospace'; ctx.fillStyle = faint; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    [0, 50, 100, 150].forEach(function (g) {
+      ctx.strokeStyle = line; ctx.setLineDash([2, 5]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad.l, y(g)); ctx.lineTo(W - pad.r, y(g)); ctx.stroke();
+      ctx.fillText(g + ' GiB', pad.l - 10, y(g));
+    });
+    ctx.setLineDash([]);
+
+    var n = levels.length, slot = plotW / n, bw = Math.min(96, slot * 0.58);
+    var lastFit = -1;
+    levels.forEach(function (agents, i) {
+      var x = pad.l + slot * i + (slot - bw) / 2;
+      var kv = kvPer * agents, cx = ctxPer * agents;
+      var total = weights + engine + kv + cx;
+      var fits = total <= ceiling;
+      if (fits) lastFit = i;
+      var segs = [[weights + engine, cW], [kv, cK], [cx, cC]];
+      var base = 0;
+      segs.forEach(function (s) {
+        var h = s[0] * t;
+        var top = base + h;
+        var y0 = y(Math.min(top, maxGiB)), y1 = y(base);
+        ctx.fillStyle = (!fits && top > ceiling) ? cB : s[1];
+        if (!fits && base < ceiling && top > ceiling) {
+          // split the segment at the ceiling: fits below, clipped above
+          ctx.fillStyle = s[1]; ctx.fillRect(x, y(ceiling), bw, y1 - y(ceiling));
+          ctx.fillStyle = cB; ctx.fillRect(x, y0, bw, y(ceiling) - y0);
+        } else {
+          ctx.fillRect(x, y0, bw, y1 - y0);
+        }
+        base = top;
+      });
+      // label
+      ctx.fillStyle = fits ? fg : cB; ctx.textAlign = 'center'; ctx.font = '600 15px Sora, system-ui, sans-serif';
+      ctx.fillText(agents, x + bw / 2, H - pad.b + 20);
+      ctx.fillStyle = faint; ctx.font = '11px IBM Plex Mono, Menlo, monospace';
+      ctx.fillText(agents === 1 ? 'agent' : 'agents', x + bw / 2, H - pad.b + 38);
+      ctx.fillStyle = fits ? muted : cB; ctx.font = '12px IBM Plex Mono, Menlo, monospace';
+      ctx.fillText((total * t).toFixed(0) + (fits ? '' : ' clip'), x + bw / 2, y(Math.min(total * t, maxGiB)) - 12);
+    });
+
+    // ceiling
+    ctx.strokeStyle = fg; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.moveTo(pad.l, y(ceiling)); ctx.lineTo(W - pad.r, y(ceiling)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.font = '500 12px IBM Plex Mono, Menlo, monospace';
+    ctx.fillText('ceiling ' + ceiling + ' GiB', pad.l + 4, y(ceiling) - 6);
+
+    // headroom bracket on the last fitting column
+    if (lastFit >= 0 && t >= 1) {
+      var agents = levels[lastFit];
+      var total = weights + engine + kvPer * agents + ctxPer * agents;
+      var x = pad.l + slot * lastFit + (slot - bw) / 2 + bw + 10;
+      ctx.strokeStyle = cH; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x, y(ceiling)); ctx.lineTo(x, y(total)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x - 4, y(ceiling)); ctx.lineTo(x + 4, y(ceiling)); ctx.moveTo(x - 4, y(total)); ctx.lineTo(x + 4, y(total)); ctx.stroke();
+      ctx.fillStyle = cH; ctx.textBaseline = 'middle'; ctx.font = '500 12px IBM Plex Mono, Menlo, monospace';
+      ctx.fillText('headroom ' + (ceiling - total).toFixed(1) + ' GiB', x + 8, (y(ceiling) + y(total)) / 2);
+      if (read) read.innerHTML = '<span class="n">' + agents + '</span> agents fit · clips at ' + levels[lastFit + 1];
+    }
+  }
+
+  function frame(ts) {
+    if (start === null) start = ts;
+    var p = Math.min(1, (ts - start) / DUR);
+    var e = 1 - Math.pow(1 - p, 3);
+    draw(e);
+    if (p < 1) requestAnimationFrame(frame);
+  }
+  draw(1);
+  if (!reduce) { start = null; requestAnimationFrame(frame); }
+  var pending = null;
+  window.addEventListener('resize', function () { if (pending) cancelAnimationFrame(pending); pending = requestAnimationFrame(function () { draw(1); }); });
+  if (window.matchMedia) {
+    try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { draw(1); }); } catch (e) {}
+  }
+  new MutationObserver(function () { draw(1); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+})();
+</script>
+
+</body>
+</html>
