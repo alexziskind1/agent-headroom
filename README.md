@@ -2,6 +2,8 @@
 
 # Agent Headroom
 
+**Version 0.1.0, early release.** The five tests run end to end on CUDA, Metal, Vulkan and ROCm and have been cross-checked on five machines, but only inside one fleet so far. Expect install friction, read [Known limits](#known-limits) before quoting numbers, and treat the result schema as version 1.0 of a moving target.
+
 Memory-aware benchmarks for agent fleets. Probes a machine, plans the largest workload that fits, runs it, reports.
 
 Five tests, each measuring a different kind of headroom, all driven by the [AgentPerf](https://pypi.org/project/agentperf-local/) agentic replay:
@@ -73,6 +75,19 @@ bench run <plan> --output-policy recorded                          # the llama.c
 ```
 
 Measurement rule: AgentPerf's default `exact` output policy only works on llama.cpp (it needs `ignore_eos` and a reported context). Every other engine runs the `recorded` policy automatically and the result says so under `replay.extra_args`; compare it only with a llama.cpp row run with `--output-policy recorded` at the same context. Nemotron 3.5 Lightning 30B-A3B is the model every engine serves at about 4 bits.
+
+## Known limits
+
+What 0.1.0 does not do, or does only partly. Each is stated in the result file where it applies.
+
+- **Residency is text-only and single-device.** On a multi-GPU box run it as a one-GPU row (`CUDA_VISIBLE_DEVICES=0` for probe, plan and run, plus `--replay-arg=--device --replay-arg=0`). llama-server is not pinned per device, so a two-GPU residency plan would split every resident across both cards and the per-device accounting would be wrong.
+- **Clusters are llama.cpp RPC only.** Residency on cluster workers launches llama-server over ssh; other engines run only on the head.
+- **Coherent memory is measured on one machine class** (DGX Station GB300) with naive demand-paged spill into LPDDR. Tensor-override placement is not implemented.
+- **Engine rows use AgentPerf's recorded output policy.** Compare a vLLM, MLX or TensorFold row only with a llama.cpp row run with `--output-policy recorded` at the same context; the exact policy works on llama.cpp alone.
+- **The full-replay warm_contexts sweep is impractical.** Level wall time grows with agents times turns times time to first token. Use `--replay warm-long-v1` for the sweep; the full replay is for the smoke.
+- **Catalog entries marked `verified: false` are estimates** and produce planner warnings. The DeepSeek-V4-Pro IQ2_XXS quant has no download URL; supply it with `--model-files`.
+- **No one outside the original fleet has installed it yet.** agentperf-local, llama-server on PATH and the gated Llama 3.1 download are the likely first obstacles. Open an issue with the probe and the command.
+- **No CI yet.** Run `python3 -m unittest discover tests` before sending changes; 80 tests, no network needed.
 
 ## License
 
