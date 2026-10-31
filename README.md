@@ -18,6 +18,87 @@ Five tests, each measuring a different kind of headroom, all driven by the [Agen
 
 Badges: **BRIDGE** (coherent memory: HBM plus host RAM over NVLink-C2C), **FLEET** (multi-node clusters), **TRACKS** (llama.cpp baseline plus the fastest engine per platform). Brand assets and rules: `docs/brand/`. Animated explainer: `docs/explainer.html`.
 
+## Agents start here
+
+This section is written for an AI agent operating a machine over a shell. Follow it in order. Humans: skip to Usage.
+
+**Contract.** `plan` never downloads or launches anything. `run` launches one inference server, replays a recorded agent workload against it, samples memory at 1 Hz, and writes one directory. Every command is idempotent except `run`, which must not be interrupted mid-level. Exit codes: 0 ok, 2 nothing fits, 3 probe failed, 4 refused (hardware drifted since the plan, machine busy, wrong model file, unknown replay), 5 server failed to start, 6 replay failed. A non-zero exit is a result, not a bug: read the last 40 lines of stderr and the result file, report them, do not retry blindly.
+
+**Rules while a run is active.** One run per machine at a time. No model downloads, builds, package installs or other GPU or RAM consumers on that machine. Do not stop a server you did not start. If `run` exits 4 with "machine is busy", something else holds memory: find it, do not kill it, report it.
+
+**Step 0: preconditions.** Run every check; fix or report before planning.
+
+```
+python3 --version                      # >= 3.10
+llama-server --version                 # llama.cpp build; put ~/.local/bin or the build dir on PATH
+agentperf-local --help | head -1       # pip install agentperf-local  (use a venv, symlink the script onto PATH)
+nvidia-smi -L 2>/dev/null || true      # CUDA boxes; AMD boxes need rocm-smi or amdgpu sysfs; Macs need nothing
+df -h ~ | tail -1                      # model files land in ~/.cache/bench/models; the 27B Q4_K_M is 16 GiB
+```
+
+**Step 1: probe.** Writes `out/probe-<host>.json`. Read `memory.topology` (unified, discrete, coherent, cluster), `memory.system_total_bytes`, `memory.system_available_bytes`, `devices[*].memory_total_bytes`, `devices[*].backend`, and `warnings[]`. If `devices` is empty the box is CPU-only and nothing below applies.
+
+```
+python3 -m bench probe
+```
+
+**Step 2: plan.** One plan per test. Each writes `out/plan-<host>-<test>.json`. Exit 2 means nothing in the catalog fits; the file still lists `rejected[]` with reasons. Read `selections[0].model_id`, `.quant`, `.context_tokens`, `.estimate.total_bytes`, `.status`, and `warnings[]`. A plan with `warnings` about `verified: false` entries is an estimate; say so when reporting.
+
+```
+python3 -m bench plan inference     --model qwen3.8-27b --context 65536
+python3 -m bench plan host_pressure --model qwen3.8-27b --context 65536
+python3 -m bench plan ladder
+python3 -m bench plan residency     --preset residency-text-workstation
+python3 -m bench plan warm_contexts --model qwen3.8-27b --context 65536 --slots 8
+```
+
+**Step 3: fetch the model.** The catalog pins every file by byte count and SHA-256. `run` refuses a file that does not match. Fetch only when no run is active on the machine.
+
+```
+python3 -m bench fetch qwen3.8-27b --quant q4_k_m     # -> ~/.cache/bench/models/qwen3.8-27b/q4_k_m/
+```
+
+**Step 4: smoke, then run.** Always smoke first with `aa-mini-v1` (one task, six turns, under a minute). Then run the real replay. Pass `--out-dir` so the directory name is yours. Expected durations on a 128 GB class box: inference 50 to 70 min, host_pressure 1 to 2 h for levels 1,2,4,8,16, residency 5 to 20 min, warm_contexts 1 to 3 h for levels 8,12,16,24, ladder 10 to 40 min.
+
+```
+python3 -m bench run out/plan-<host>-inference.json --replay aa-mini-v1 --out-dir out/runs/<host>-inference-smoke
+python3 -m bench run out/plan-<host>-inference.json --out-dir out/runs/<host>-inference-01
+python3 -m bench run out/plan-<host>-host_pressure.json --levels 1,2,4,8,16 --out-dir out/runs/<host>-host_pressure-01
+python3 -m bench run out/plan-<host>-residency.json --out-dir out/runs/<host>-residency-01
+python3 -m bench run out/plan-<host>-warm_contexts.json --levels 8,12,16,24 --out-dir out/runs/<host>-warm_contexts-01
+python3 -m bench run out/plan-<host>-ladder.json --out-dir out/runs/<host>-ladder-01
+```
+
+Run them in the background with output to a log file and poll the log; a run can take hours and must survive your session. On a multi-GPU discrete box run residency as a one-GPU row: `CUDA_VISIBLE_DEVICES=0` on probe, plan and run, plus `--replay-arg=--device --replay-arg=0`.
+
+**Step 5: read the result.** Every run directory holds `results.json`, `probe.json`, `server.log`, `memory.jsonl`, `attached-server.yaml` and the raw replay output under `agentperf/`. Top-level keys common to all tests: `status` (ok or failed), `test`, `host`, `selection`, `server.version`, `server.argv`, `artifact.sha256`, `artifact.verified`, `memory.peak_host_used_bytes`, `memory.peak_gpu_used_bytes`, `memory.peak_swap_used_bytes`, `duration_s`. Per test:
+
+| test | read | means |
+|---|---|---|
+| inference | `agentperf.output_tokens_per_second`, `agentperf.end_to_end_output_tokens_per_second`, `agentperf.totals.successful_turns` of 168, `agentperf.wall_duration_ms` | decode speed, speed including prefill, completeness, wall |
+| host_pressure | `max_sustained_agents`, `stopped_because`, `levels[*].n`, `levels[*].aggregate.aggregate_output_tokens_per_second`, `levels[*].aggregate.failed_turns`, `levels[*].peak_host_used_bytes` | concurrency headroom and why it ended |
+| residency | `resident[]`, `evicted[]`, `cycle[*].swap_s`, `cycle[*].victims` (evicted entries only), `cycle[*].restore_page_cache_bytes`, `swap_s_total`, `tasks_per_minute` | models kept loaded, what a swap costs |
+| warm_contexts | `max_sustained_agents`, `knee_measured_agents`, `levels[*].n`, `levels[*].aggregate.prompt_cache_hit_ratio`, `levels[*].aggregate.ttft_p50_ms`, `levels[*].aggregate.tasks_per_minute`, `levels[*].peak_host_used_bytes` | contexts kept warm before restores become re-prefills |
+| ladder | `selection.model_id`, `selection.context_tokens`, `agentperf.output_tokens_per_second` | the top rung and its speed |
+
+Then fold everything you have:
+
+```
+python3 -m bench report            # markdown tables per test over out/ and out/remote/
+```
+
+**Step 6: report.** Send the run directory path, `result_id`, `status`, the per-test numbers above, `memory.peak_*`, `server.version`, and every `warnings[]` from the probe and the plan. Quote numbers with their context (model, quant, context_tokens, replay name, output policy from `replay.extra_args`). Never compare an engine row to a llama.cpp row that did not use `--output-policy recorded`. Never present a planner estimate as a measurement.
+
+**Remote machines.** The same commands run on another host from here; the package is shipped over ssh and `out/` comes back to `out/remote/<host>/`. The target needs Python, `llama-server` and `agentperf-local` on PATH for a non-interactive shell (`~/.local/bin` is added automatically). Jump hosts and per-hop keys: `jump/target?i=~/.ssh/key`.
+
+```
+python3 -m bench remote <host> probe
+python3 -m bench remote <host> plan inference --model qwen3.8-27b --context 65536
+python3 -m bench remote <host> run out/plan-<host>-inference.json --out-dir out/runs/<host>-inference-01
+```
+
+**When to stop and ask a human.** The probe reports a topology or backend you did not expect. The plan's `rejected[]` names the model you were told to run. `run` exits 4 twice for the same reason. A GPU error, ECC or row-remap counter changes during a run. Free disk under twice the model size. Anything that would require killing a process you did not start.
+
 Status: probe, planner, `run` for inference, host_pressure, and text-only residency (llama.cpp + AA-AgentPerf-Local replay), `report`, `remote`, coherent-memory placement (GB300 station class) and llama.cpp RPC clusters.
 
 ```
