@@ -282,6 +282,26 @@
      ]
     },
     {
+     "quant": "q8_0",
+     "bytes": 28595763648,
+     "sha256": "aab65c67ef0dad127960efef9247f1832bca105faa1c7a052cc039b223cf86a1",
+     "filename": "Qwen3.8-27B-Q8_0.gguf",
+     "url": "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/a316ea527fde32c12487be7574e2db5ac2ad2a7e/Qwen3.8-27B-Q8_0.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "verified": true,
+     "parts": [
+      {
+       "filename": "Qwen3.8-27B-Q8_0.gguf",
+       "bytes": 28595763648,
+       "sha256": "aab65c67ef0dad127960efef9247f1832bca105faa1c7a052cc039b223cf86a1",
+       "url": "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/a316ea527fde32c12487be7574e2db5ac2ad2a7e/Qwen3.8-27B-Q8_0.gguf"
+      }
+     ],
+     "_note": "added for the PNY RTX Pro ladder 48 GB rung (2026-11-05); overhead not yet measured"
+    },
+    {
      "quant": "fp8",
      "bytes": 30866866928,
      "sha256": null,
@@ -870,6 +890,84 @@
      ]
     }
    ]
+  },
+  {
+   "id": "gpt-oss-20b",
+   "modality": "text",
+   "params_total": 20910000000,
+   "params_active": 3610000000,
+   "arch": {
+    "n_layers": 12,
+    "n_kv_heads": 8,
+    "head_dim": 64,
+    "_note": "full-attention layers only; the other half are sliding-window (128 tokens) and hold a fixed small KV"
+   },
+   "context": {
+    "min": 8192,
+    "max": 131072
+   },
+   "verified": false,
+   "_note": "added for the PNY RTX Pro ladder (2026-11-05); arch from openai/gpt-oss-20b config.json, overhead not yet measured",
+   "files": [
+    {
+     "quant": "mxfp4",
+     "bytes": 12109566560,
+     "sha256": "be37a636aca0fc1aae0d32325f82f6b4d21495f06823b5fbc1898ae0303e9935",
+     "filename": "gpt-oss-20b-mxfp4.gguf",
+     "url": "https://huggingface.co/ggml-org/gpt-oss-20b-GGUF/resolve/e1dc459feff949ff451ce107337a2026daa80df8/gpt-oss-20b-mxfp4.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "verified": true,
+     "parts": [
+      {
+       "filename": "gpt-oss-20b-mxfp4.gguf",
+       "bytes": 12109566560,
+       "sha256": "be37a636aca0fc1aae0d32325f82f6b4d21495f06823b5fbc1898ae0303e9935",
+       "url": "https://huggingface.co/ggml-org/gpt-oss-20b-GGUF/resolve/e1dc459feff949ff451ce107337a2026daa80df8/gpt-oss-20b-mxfp4.gguf"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "gpt-oss-120b",
+   "modality": "text",
+   "params_total": 116830000000,
+   "params_active": 5130000000,
+   "arch": {
+    "n_layers": 18,
+    "n_kv_heads": 8,
+    "head_dim": 64,
+    "_note": "full-attention layers only; the other half are sliding-window (128 tokens) and hold a fixed small KV"
+   },
+   "context": {
+    "min": 8192,
+    "max": 131072
+   },
+   "verified": false,
+   "_note": "added for the PNY RTX Pro ladder (2026-11-05); arch from openai/gpt-oss-120b config.json, overhead not yet measured",
+   "files": [
+    {
+     "quant": "mxfp4",
+     "bytes": 63387346208,
+     "sha256": "582bd40f6886200101f4c4ed9f25f3fe80cc14c86e9e2b37746cd8904a0c622d",
+     "filename": "gpt-oss-120b-MXFP4.gguf",
+     "url": "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/7200b74bea78b0a2964ef9f3897eefa401e890ff/gpt-oss-120b-MXFP4.gguf",
+     "engines": [
+      "llama.cpp"
+     ],
+     "verified": true,
+     "parts": [
+      {
+       "filename": "gpt-oss-120b-MXFP4.gguf",
+       "bytes": 63387346208,
+       "sha256": "582bd40f6886200101f4c4ed9f25f3fe80cc14c86e9e2b37746cd8904a0c622d",
+       "url": "https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/7200b74bea78b0a2964ef9f3897eefa401e890ff/gpt-oss-120b-MXFP4.gguf"
+      }
+     ]
+    }
+   ]
   }
  ],
  "presets": {
@@ -890,6 +988,17 @@
     "qwen3.8-27b",
     "qwen3.6-35b-a3b",
     "qwen3.5-9b",
+    "ling-3.0-flash"
+   ],
+   "context": 32768
+  },
+  "residency-ladder": {
+   "description": "PNY RTX Pro ladder (16-96 GB discrete cards): smallest first, so every card keeps at least one model. gpt-oss is left out: its llama.cpp tool-call grammar fails AgentPerf exact policy (2026-11-05). Pack order is priority order.",
+   "models": [
+    "qwen3.5-9b",
+    "nemotron-3.5-lightning-30b-a3b",
+    "qwen3.8-27b",
+    "qwen3.6-35b-a3b",
     "ling-3.0-flash"
    ],
    "context": 32768
