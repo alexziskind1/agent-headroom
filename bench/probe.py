@@ -106,10 +106,10 @@ def probe_host() -> dict:
         reg = _run(["reg", "query", r"HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0", "/v", "ProcessorNameString"])
         if reg:
             for line in reg.splitlines():
-                if "ProcessorNameString" in line:
-                    cpu_model = line.split("REG_SZ", 1)[1].strip()
+                if "ProcessorNameString" in line and "REG_SZ" in line:
+                    cpu_model = line.rpartition("REG_SZ")[2].strip()
                     break
-        os_version = uname.release
+        os_version = platform.version() or uname.release
     else:
         os_version = uname.release
     return {
@@ -190,7 +190,10 @@ def probe_system_memory() -> dict:
             ]
         st = MEMORYSTATUSEX()
         st.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
+        gms = ctypes.windll.kernel32.GlobalMemoryStatusEx
+        gms.argtypes = [ctypes.POINTER(MEMORYSTATUSEX)]
+        gms.restype = ctypes.c_bool
+        if gms(ctypes.byref(st)):
             total = st.ullTotalPhys
             available = st.ullAvailPhys
             swap = max(st.ullTotalPageFile - st.ullTotalPhys, 0)
