@@ -102,6 +102,14 @@ def probe_host() -> dict:
     elif uname.system == "Darwin":
         cpu_model = _run(["sysctl", "-n", "machdep.cpu.brand_string"])
         os_version = _run(["sw_vers", "-productVersion"])
+    elif uname.system == "Windows":
+        reg = _run(["reg", "query", r"HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0", "/v", "ProcessorNameString"])
+        if reg:
+            for line in reg.splitlines():
+                if "ProcessorNameString" in line and "REG_SZ" in line:
+                    cpu_model = line.rpartition("REG_SZ")[2].strip()
+                    break
+        os_version = platform.version() or uname.release
     else:
         os_version = uname.release
     return {
@@ -165,6 +173,30 @@ def probe_system_memory() -> dict:
         swap = 0
         for tok in sw.replace("=", " ").split():
             pass
+    elif sys.platform == "win32":
+        # GlobalMemoryStatusEx reports physical totals; ullTotalPageFile is commit limit
+        # (RAM + page file), so the page-file portion is the part above RAM.
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+        st = MEMORYSTATUSEX()
+        st.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        gms = ctypes.windll.kernel32.GlobalMemoryStatusEx
+        gms.argtypes = [ctypes.POINTER(MEMORYSTATUSEX)]
+        gms.restype = ctypes.c_bool
+        if gms(ctypes.byref(st)):
+            total = st.ullTotalPhys
+            available = st.ullAvailPhys
+            swap = max(st.ullTotalPageFile - st.ullTotalPhys, 0)
     return {
         "topology": None,  # filled after devices are known
         "system_total_bytes": total,
